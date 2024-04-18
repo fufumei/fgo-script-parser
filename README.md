@@ -24,4 +24,4 @@ This script will output a markdown file containing a table, where the first colu
 
 **Note:** the script is recursive and *within a chapter folder* it will go deeper until a file is found, meaning chapters can have multiple folders within their structure (in the case of LB6 and LB7, for example) but the output will combine all those files into one total. 
 
-**The powershell script is not very efficient and doesn't have the best output format. Write your own script for actually useful mass output.**
+**The powershell script is not very efficient whatsoever and doesn't have the best output format. Write your own script for actually useful mass output.**
