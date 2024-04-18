@@ -18,7 +18,8 @@ func main() {
 		panic(err)
 	}
 
-	r, _ := regexp.Compile(`＠.*\n(.|\n)+?\n\[k\]|(？.+?：)`)
+	// r, _ := regexp.Compile(`＠.*\n(.|\n)+?\n\[k\]|(？.+?：)`)
+	r, _ := regexp.Compile(`(＠([A-Z][：:])?(.*)\n)(.*?\n(?:.*?\n)?)?(.*?)\n\[k\]|(？.+?：)`)
 	matches := r.FindAllStringIndex(string(data), -1)
 	fmt.Println(len(matches))
 }
