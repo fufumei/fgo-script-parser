@@ -19,13 +19,6 @@ func main() {
 		return
 	}
 
-	file, err := os.Create("script-length.csv")
-	if err != nil {
-		log.Fatalf("Could not create output file...")
-	}
-	w := csv.NewWriter(file)
-	w.Comma = '\t'
-
 	argInfo, err := os.Stat(os.Args[1])
 	if err != nil {
 		log.Fatalf(fmt.Sprintf("Could not get file info for %s", os.Args[1]))
@@ -33,13 +26,20 @@ func main() {
 
 	// If given path is a file, just open and count it, else traverse the directory
 	if argInfo.IsDir() {
+		file, err := os.Create("script-length.csv")
+		if err != nil {
+			log.Fatalf("Could not create output file...")
+		}
+		w := csv.NewWriter(file)
+		w.Comma = '\t'
+
 		TraverseDirectories(os.Args[1], w)
+		w.Flush()
 	} else {
 		lines := CountLines(os.Args[1])
-		w.Write([]string{os.Args[1], fmt.Sprint(lines)})
+		fmt.Printf("%s\t%d", strings.TrimSuffix(filepath.Base(os.Args[1]), filepath.Ext(os.Args[1])), lines)
 	}
 
-	w.Flush()
 }
 
 func TraverseDirectories(path string, w *csv.Writer) {
