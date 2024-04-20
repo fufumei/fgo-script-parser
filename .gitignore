@@ -1,6 +1,6 @@
 # Test stuff
 /scripts
-script-length.md
+*.csv
 
 # Binaries for programs and plugins
 *.exe
