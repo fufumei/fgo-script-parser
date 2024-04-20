@@ -12,8 +12,10 @@ The output format is `folder name    total lines`.
 Note that, if for example all LB6 scripts are separated into different folders for the respective "parts", the output will reflect this.   
 
 ### Regex matching
-The script regex-matches dialogue lines with the following pattern: `＠.*\n(.|\n)+?\n\[k\]|(？.+?：)`  
-`＠.*\n(.|\n)+?\n\[k\]` should match any regular dialogue line, whether standard format, narration (no nametag), or interspersed with function tags.  
+The script regex-matches dialogue lines with the following pattern: `(＠([A-Z][：:])?(.*)\n)(.*?\n(?:.*?\n)?)?(.*?)\n\[k\]|(？.+?：)`  
+
+`(＠([A-Z][：:])?(.*)\n)(.*?\n(?:.*?\n)?)?(.*?)\n\[k\]` should match any regular dialogue line, whether standard format, narration (no nametag), or interspersed with function tags.  
+
 `(？.+?：)` should match any player choice, including ones with special interactions, such as in LB6.
 
 ### Special cases
