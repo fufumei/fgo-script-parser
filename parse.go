@@ -32,12 +32,13 @@ func main() {
 		}
 		w := csv.NewWriter(file)
 		w.Comma = '\t'
+		w.Write([]string{"Nane", "Lines", "Characters"})
 
 		TraverseDirectories(os.Args[1], w)
 		w.Flush()
 	} else {
-		lines := CountLines(os.Args[1])
-		fmt.Printf("%s\t%d", strings.TrimSuffix(filepath.Base(os.Args[1]), filepath.Ext(os.Args[1])), lines)
+		lines, characters := CountLinesChars(os.Args[1])
+		fmt.Printf("%s\t%d\t%d", strings.TrimSuffix(filepath.Base(os.Args[1]), filepath.Ext(os.Args[1])), lines, characters)
 	}
 
 }
@@ -61,6 +62,7 @@ func TraverseDirectories(path string, w *csv.Writer) {
 	}
 
 	lines := 0
+	characters := 0
 	// One line in OC2 is missing the @ and can't be counted regularly
 	if slices.ContainsFunc(entries, func(e fs.DirEntry) bool {
 		return strings.HasPrefix(e.Name(), "040003")
@@ -69,18 +71,27 @@ func TraverseDirectories(path string, w *csv.Writer) {
 	}
 
 	for _, e := range entries {
-		lines += CountLines(filepath.Join(path, e.Name()))
+		l, c := CountLinesChars(filepath.Join(path, e.Name()))
+		lines += l
+		characters += c
 	}
-	w.Write([]string{filepath.Base(path), fmt.Sprint(lines)})
+	w.Write([]string{filepath.Base(path), fmt.Sprint(lines), fmt.Sprint(characters)})
 }
 
-func CountLines(path string) int {
+func CountLinesChars(path string) (int, int) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		log.Fatalf(fmt.Sprintf("Can't read file: %s", path))
 	}
 
-	r, _ := regexp.Compile(`(＠([A-Z][：:])?(.*)\n)(.*?\n(?:.*?\n)?)?(.*?)\n\[k\]|(？.+?：)`)
-	matches := r.FindAllStringIndex(string(data), -1)
-	return len(matches)
+	r, _ := regexp.Compile(`(＠([A-Z][：:])?(.*)\n)(.*?\n(?:.*?\n)?)?(.*?)\n\[k\]|(？.+?：.+)`)
+	matches := r.FindAllString(string(data), -1)
+	lines := len(matches)
+	characters := 0
+	r, _ = regexp.Compile(`(\[[^#&]+?\]|[\[\]#&:]|？.+?：|^＠.+|\n)`)
+	for _, m := range matches {
+		characters += len([]rune(r.ReplaceAllString(m, "")))
+	}
+
+	return lines, characters
 }
