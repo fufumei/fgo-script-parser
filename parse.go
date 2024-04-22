@@ -32,7 +32,7 @@ func main() {
 		}
 		w := csv.NewWriter(file)
 		w.Comma = '\t'
-		w.Write([]string{"Nane", "Lines", "Characters"})
+		w.Write([]string{"Name", "Lines", "Characters"})
 
 		TraverseDirectories(os.Args[1], w)
 		w.Flush()
