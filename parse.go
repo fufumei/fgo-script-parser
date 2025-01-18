@@ -20,18 +20,18 @@ import (
 // fgo-script-parser <path> [--no-file] [--ignore-splits]
 
 var CLI struct {
-	NoFile bool `name:"no-file" default:"true"`
+	NoFile bool `name:"no-file" default:"true" help:"If true, print the result directly to the terminal, otherwise outputs to a csv on the same level as the script."`
 
 	Atlas struct {
-		War    string `required short:"w" xor:"type"`
-		Quest  string `required short:"q" xor:"type"`
-		Script string `required short:"s" xor:"type"`
-	} `cmd:""`
+		War    string `required short:"w" xor:"type" help:"A war ID to query against Atlas."`
+		Quest  string `required short:"q" xor:"type" help:"A quest ID to query against Atlas."`
+		Script string `required short:"s" xor:"type" help:"A script ID to query against Atlas."`
+	} `cmd:"" help:"Fetches scripts from Atlas API to parse."`
 	Local struct {
-		IgnoreSplits bool `name:"ignore-splits" default:"false"`
+		IgnoreSplits bool `name:"ignore-splits" default:"false" hidden:""`
 
 		Path string `arg:"" name:"path" type:"path"`
-	} `cmd:""`
+	} `cmd:"" help:"Parses locally stored scripts."`
 }
 
 func main() {
@@ -222,6 +222,7 @@ func TraverseDirectories(path string, writer *csv.Writer) {
 
 	lines := 0
 	characters := 0
+	// TODO: This could be done with goroutines but it's pretty fast already
 	for _, e := range entries {
 		data, err := os.ReadFile(filepath.Join(path, e.Name()))
 		if err != nil {
