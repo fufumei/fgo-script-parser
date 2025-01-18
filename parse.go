@@ -9,13 +9,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/alecthomas/kong"
 	"github.com/go-zoox/fetch"
 	"golang.org/x/exp/slices"
 )
 
-// fgo-script-parser atlas [--war <ID>] [--quest <ID>] [<script ID]
+// fgo-script-parser atlas [--no-file] [--war <ID>] [--quest <ID>] [<script ID]
 // fgo-script-parser <path> [--no-file] [--ignore-splits]
 
 var CLI struct {
@@ -23,8 +24,8 @@ var CLI struct {
 
 	Atlas struct {
 		War    string `required short:"w" xor:"type"`
-		Quest  string `required short:"q" xor:"type" hidden:""`
-		Script string `required short:"s" xor:"type" hidden:""`
+		Quest  string `required short:"q" xor:"type"`
+		Script string `required short:"s" xor:"type"`
 	} `cmd:""`
 	Local struct {
 		IgnoreSplits bool `name:"ignore-splits" default:"false"`
@@ -37,15 +38,15 @@ func main() {
 	ctx := kong.Parse(&CLI)
 	switch ctx.Command() {
 	case "atlas":
-		RunAtlas()
+		ParseFromAtlas()
 	case "local <path>":
-		RunLocal()
+		ParseFromLocal()
 	default:
 		panic(ctx.Command())
 	}
 }
 
-func RunAtlas() {
+func ParseFromAtlas() {
 	var writer *csv.Writer
 	if !CLI.NoFile {
 		file := CreateFile()
@@ -56,12 +57,29 @@ func RunAtlas() {
 	writer.Comma = '\t'
 	writer.Write([]string{"Name", "Lines", "Characters"})
 
-	// TODO: Only handles war IDs for now
-	FetchScripts(CLI.Atlas.War, writer)
+	var scripts []Script
+	var name string
+	if CLI.Atlas.War != "" {
+		s, n := FetchWarScripts(CLI.Atlas.War)
+		name = n
+		scripts = append(scripts, s...)
+		// The quest list for OC2 does not include the appendix
+		if CLI.Atlas.War == "403" {
+			scripts = append(scripts, FetchQuestScripts("4000327")...)
+		}
+	} else if CLI.Atlas.Quest != "" {
+		scripts = append(scripts, FetchQuestScripts(CLI.Atlas.Quest)...)
+		name = CLI.Atlas.Quest
+	} else if CLI.Atlas.Script != "" {
+		FetchScript(CLI.Atlas.Script, writer)
+		writer.Flush()
+		return
+	}
+	ParseScripts(scripts, name, writer)
 	writer.Flush()
 }
 
-func RunLocal() {
+func ParseFromLocal() {
 	var writer *csv.Writer
 	if !CLI.NoFile {
 		file := CreateFile()
@@ -74,12 +92,12 @@ func RunLocal() {
 
 	argInfo, err := os.Stat(CLI.Local.Path)
 	if err != nil {
-		log.Fatalf("Could not get file info for %s", CLI.Local.Path)
+		log.Fatalf("Could not get file info for %s.", CLI.Local.Path)
 	}
 
 	// If given path is a file, just open and count it, else traverse the directory
 	if argInfo.IsDir() {
-		TraverseDirectories(os.Args[1], writer)
+		TraverseDirectories(CLI.Local.Path, writer)
 		writer.Flush()
 	} else {
 		data, err := os.ReadFile(CLI.Local.Path)
@@ -99,42 +117,49 @@ func CreateFile() *os.File {
 	return file
 }
 
-func FetchScripts(warId string, writer *csv.Writer) {
-	type Scripts struct {
-		ScriptId string `json:"scriptId"`
-		Script   string `json:"script"`
+func ParseScripts(scripts []Script, name string, writer *csv.Writer) {
+	lines := 0
+	characters := 0
+	ch := make(chan Count, len(scripts))
+	wg := sync.WaitGroup{}
+	for _, script := range scripts {
+		wg.Add(1)
+
+		go func(script Script) {
+			r, err := fetch.Get(script.Script)
+			if err != nil {
+				log.Fatalf("Error fetching script " + script.ScriptId)
+				return
+			}
+			l, c := CleanAndCountScript(r.String())
+			ch <- Count{l, c}
+			wg.Done()
+		}(script)
 	}
 
-	type PhaseScripts struct {
-		Phase   int `json:"phase"`
-		Scripts []Scripts
+	wg.Wait()
+	close(ch)
+
+	for c := range ch {
+		lines += c.lines
+		characters += c.characters
 	}
 
-	type Quests struct {
-		Id           int    `json:"id"`
-		Type         string `json:"type"`
-		PhaseScripts []PhaseScripts
-	}
+	writer.Write([]string{name, fmt.Sprint(lines), fmt.Sprint(characters)})
+}
 
-	type Response struct {
-		Name  string `json:"name"`
-		Spots []struct {
-			Quests []Quests
-		}
-	}
-
+func FetchWarScripts(id string) ([]Script, string) {
 	var result Response
-	response, err := fetch.Get("https://api.atlasacademy.io/nice/JP/war/" + warId + "?lang=en")
+	response, err := fetch.Get(fmt.Sprintf("https://api.atlasacademy.io/nice/JP/war/%s?lang=en", id))
 	if err != nil {
-		log.Fatalf("Could not get data for war with ID %s", warId)
+		log.Fatalf("Could not get data for war with ID %s", id)
 	}
 	err = response.UnmarshalJSON(&result)
 	if err != nil {
 		log.Fatal("Error unmarshaling JSON:", err)
 	}
 
-	fmt.Printf("Extracting scripts...\n")
-	var scripts []Scripts
+	var scripts []Script
 	for _, spot := range result.Spots {
 		for _, quest := range spot.Quests {
 			// This works for both main story and event quests
@@ -145,29 +170,36 @@ func FetchScripts(warId string, writer *csv.Writer) {
 			}
 		}
 	}
-	fmt.Printf("Finished extracting scripts.\n\n")
+	return scripts, result.Name
+}
 
-	lines := 0
-	characters := 0
-	// One line in OC2 is missing the @ and can't be counted regularly
-	if warId == "403" {
-		lines = 1
+func FetchQuestScripts(id string) []Script {
+	var result Quest
+	response, err := fetch.Get(fmt.Sprintf("https://api.atlasacademy.io/nice/JP/quest/%s?lang=en", id))
+	if err != nil {
+		log.Fatalf("Could not get data for quest with ID %s", id)
 	}
-	// TODO: This could be done async in parallel
-	for _, script := range scripts {
-		fmt.Printf("Fetching %s...\n", script.ScriptId)
-		r, err := fetch.Get(script.Script)
-		if err != nil {
-			log.Fatalf("Error fetching script " + script.ScriptId)
-			return
-		}
-		fmt.Printf("Counting %s...\n", script.ScriptId)
-		l, c := CleanAndCountScript(r.String())
-		lines += l
-		characters += c
-		fmt.Printf("Next script...\n")
+	err = response.UnmarshalJSON(&result)
+	if err != nil {
+		log.Fatal("Error unmarshaling JSON:", err)
 	}
-	writer.Write([]string{result.Name, fmt.Sprint(lines), fmt.Sprint(characters)})
+
+	var scripts []Script
+	for _, phase := range result.PhaseScripts {
+		scripts = append(scripts, phase.Scripts...)
+	}
+
+	return scripts
+}
+
+func FetchScript(id string, writer *csv.Writer) {
+	r, err := fetch.Get(fmt.Sprintf("https://static.atlasacademy.io/JP/Script/%s/%s.txt", id[0:2], id))
+	if err != nil {
+		log.Fatalf("Error fetching script " + id)
+		return
+	}
+	l, c := CleanAndCountScript(r.String())
+	writer.Write([]string{id, fmt.Sprint(l), fmt.Sprint(c)})
 }
 
 func TraverseDirectories(path string, writer *csv.Writer) {
@@ -190,13 +222,6 @@ func TraverseDirectories(path string, writer *csv.Writer) {
 
 	lines := 0
 	characters := 0
-	// One line in OC2 is missing the @ and can't be counted regularly
-	if slices.ContainsFunc(entries, func(e fs.DirEntry) bool {
-		return strings.HasPrefix(e.Name(), "040003")
-	}) {
-		lines = 1
-	}
-
 	for _, e := range entries {
 		data, err := os.ReadFile(filepath.Join(path, e.Name()))
 		if err != nil {
