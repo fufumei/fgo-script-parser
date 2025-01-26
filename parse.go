@@ -16,11 +16,8 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-// fgo-script-parser atlas [--no-file] [--war <ID>] [--quest <ID>] [<script ID]
-// fgo-script-parser <path> [--no-file] [--ignore-splits]
-
 var CLI struct {
-	NoFile bool `name:"no-file" default:"true" help:"If true, print the result directly to the terminal, otherwise outputs to a csv on the same level as the script."`
+	NoFile bool `name:"no-file" default:"false" help:"If true, print the result directly to the terminal, otherwise outputs to a csv on the same level as the script."`
 
 	Atlas struct {
 		War    string `required short:"w" xor:"type" help:"A war ID to query against Atlas."`
