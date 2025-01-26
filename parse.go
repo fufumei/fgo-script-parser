@@ -57,25 +57,38 @@ func ParseFromAtlas() {
 	writer.Comma = '\t'
 	writer.Write([]string{"Name", "Lines", "Characters"})
 
-	var scripts []Script
+	scripts := make(map[string]Script)
 	var name string
 	if CLI.Atlas.War != "" {
 		s, n := FetchWarScripts(CLI.Atlas.War)
 		name = n
-		scripts = append(scripts, s...)
+		for _, script := range s {
+			scripts[script.ScriptId] = script
+		}
 		// The quest list for OC2 does not include the appendix
 		if CLI.Atlas.War == "403" {
-			scripts = append(scripts, FetchQuestScripts("4000327")...)
+			s = FetchQuestScripts("4000327")
+			for _, script := range s {
+				scripts[script.ScriptId] = script
+			}
 		}
 	} else if CLI.Atlas.Quest != "" {
-		scripts = append(scripts, FetchQuestScripts(CLI.Atlas.Quest)...)
+		s := FetchQuestScripts(CLI.Atlas.Quest)
+		for _, script := range s {
+			scripts[script.ScriptId] = script
+		}
 		name = CLI.Atlas.Quest
 	} else if CLI.Atlas.Script != "" {
 		FetchScript(CLI.Atlas.Script, writer)
 		writer.Flush()
 		return
 	}
-	ParseScripts(scripts, name, writer)
+
+	var scr []Script
+	for _, v := range scripts {
+		scr = append(scr, v)
+	}
+	ParseScripts(scr, name, writer)
 	writer.Flush()
 }
 
