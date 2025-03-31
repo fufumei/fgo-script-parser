@@ -26,6 +26,13 @@ type Styles struct {
 	ItemDescription         lipgloss.Style
 	SelectedItemDescription lipgloss.Style
 	DisabledItemDescription lipgloss.Style
+
+	ActiveText lipgloss.Style
+	Text       lipgloss.Style
+	Cursor     lipgloss.Style
+
+	CheckboxLabel       lipgloss.Style
+	CheckboxDescription lipgloss.Style
 }
 
 func NewStyles() (s Styles) {
@@ -50,6 +57,10 @@ func NewStyles() (s Styles) {
 	s.SelectedItemDescription = s.SelectedItemTitle.
 		Foreground(lipgloss.AdaptiveColor{Light: "#F793FF", Dark: "#AD58B4"})
 	s.DisabledItemDescription = s.ItemDescription.Foreground(grayColor)
+
+	s.ActiveText = lipgloss.NewStyle().Foreground(whiteColor)
+	s.Text = lipgloss.NewStyle().Foreground(lightGrayColor)
+	s.Cursor = lipgloss.NewStyle().Foreground(whiteColor)
 
 	return s
 }

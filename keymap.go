@@ -35,7 +35,7 @@ func DefaultKeybinds() KeyMap {
 		),
 		Confirm: key.NewBinding(
 			key.WithKeys("enter"),
-			key.WithHelp("enter", "parse"),
+			key.WithHelp("enter", "confirm"),
 			key.WithDisabled(),
 		),
 		// Attach: key.NewBinding(
@@ -82,7 +82,7 @@ func (m *Model) updateKeymap() {
 	m.keymap.PrevInput.SetEnabled(m.state != selectSource)
 	m.keymap.NextOption.SetEnabled(m.state == selectSource || m.state == selectAtlasIdType)
 	m.keymap.PrevOption.SetEnabled(m.state == selectSource || m.state == selectAtlasIdType)
-	m.keymap.Confirm.SetEnabled(m.state == hoveringConfirmButton)
+	m.keymap.Confirm.SetEnabled(m.state == hoveringConfirmButton || m.state == selectNoFile)
 	// m.keymap.Unattach.SetEnabled(m.state == editingAttachments && len(m.Attachments.Items()) > 0)
 	// m.keymap.Back.SetEnabled(m.state == pickingFile)
 

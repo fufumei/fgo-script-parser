@@ -5,6 +5,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -15,6 +17,7 @@ const (
 	selectAtlasIdType
 	enteringIds
 	pickingFile
+	selectNoFile
 	hoveringConfirmButton
 	parsing
 )
@@ -51,32 +54,61 @@ type Model struct {
 	atlasIdType        AtlasIdType
 	atlasIdTypeOptions []ListItem
 
-	// // filepicker is used to pick file attachments.
+	// ID list for atlas parsing
+	IdInput textinput.Model
+
+	// filepicker for local parsing.
 	// filepicker     filepicker.Model
-	// loadingSpinner spinner.Model
-	help     help.Model
-	keymap   KeyMap
-	quitting bool
-	abort    bool
-	// err            error
+
+	// Print to file or not
+	NoFile bool
+
+	loadingSpinner spinner.Model
+	help           help.Model
+	keymap         KeyMap
+	quitting       bool
+	abort          bool
 }
 
 func NewModel() Model {
+	styles := NewStyles()
+
+	body := textinput.New()
+	// body.ShowLineNumbers = false
+	// body.FocusedStyle.CursorLine = styles.ActiveText
+	// body.FocusedStyle.Prompt = styles.ActiveLabel
+	// body.FocusedStyle.Text = styles.ActiveText
+	// body.BlurredStyle.CursorLine = styles.Text
+	// body.BlurredStyle.Text = styles.Text
+	// body.Cursor.Style = styles.Cursor
+	body.Prompt = "ID: "
+	body.Placeholder = "_ "
+	body.PromptStyle = styles.Disabled
+	body.Cursor.Style = styles.Cursor
+	body.TextStyle = styles.Text
+
+	loadingSpinner := spinner.New()
+	loadingSpinner.Style = styles.ActiveLabel
+	loadingSpinner.Spinner = spinner.Dot
+
 	m := Model{
 		state:  selectSource,
-		styles: NewStyles(),
+		styles: styles,
 		source: atlas,
 		sourceOptions: []ListItem{
 			{Title: "Atlas", Description: "Parse directly from Atlas IDs"},
-			{Title: "Local", Description: "Parse from local files on your computer"}},
+			{Title: "Local", Description: "Parse from local files on your computer\n(NOTE: Not implemented currently)"}},
 		atlasIdType: war,
 		atlasIdTypeOptions: []ListItem{
 			{Title: "War", Description: "Parse every script in a war (story chapter or event).\nEx: 100 for Fuyuki"},
 			{Title: "Quest", Description: "Parse every script in a quest (war section or interlude etc).\nEx: 1000001 for Fuyuki chapter 1"},
 			{Title: "Script", Description: "Parse specific scripts individually.\nEx: 0100000111 for Fuyuki chapter 1 post battle scene"},
 		},
-		help:   help.New(),
-		keymap: DefaultKeybinds(),
+		IdInput:        body,
+		NoFile:         false,
+		loadingSpinner: loadingSpinner,
+		help:           help.New(),
+		keymap:         DefaultKeybinds(),
 	}
 
 	return m
@@ -90,6 +122,11 @@ func (m Model) Init() tea.Cmd {
 // Update is the update loop for the model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case parseSuccessMsg:
+		{
+			m.quitting = true
+			return m, tea.Quit
+		}
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.NextInput):
@@ -97,6 +134,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case selectSource:
 				m.state = selectAtlasIdType
 			case selectAtlasIdType:
+				m.state = enteringIds
+
+				m.IdInput.PromptStyle = m.styles.ActiveLabel
+				m.IdInput.TextStyle = m.styles.ActiveText
+				m.IdInput.Focus()
+				m.IdInput.CursorEnd()
+			case enteringIds:
+				m.IdInput.Blur()
+				m.state = selectNoFile
+			case selectNoFile:
 				m.state = hoveringConfirmButton
 			}
 
@@ -104,8 +151,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.state {
 			case selectAtlasIdType:
 				m.state = selectSource
-			case hoveringConfirmButton:
+			case enteringIds:
+				m.IdInput.Blur()
 				m.state = selectAtlasIdType
+				m.IdInput.PromptStyle = m.styles.Disabled
+				m.IdInput.TextStyle = m.styles.Text
+			case selectNoFile:
+				m.state = enteringIds
+				m.IdInput.PromptStyle = m.styles.ActiveLabel
+				m.IdInput.TextStyle = m.styles.ActiveText
+				m.IdInput.Focus()
+				m.IdInput.CursorEnd()
+			case hoveringConfirmButton:
+				m.state = selectNoFile
 			}
 
 		case key.Matches(msg, m.keymap.NextOption):
@@ -137,12 +195,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case key.Matches(msg, m.keymap.Confirm):
-			m.state = parsing
-			return m, tea.Batch(
-			// loading spinner
-			// call parsing functions
-			// change to result view (split view?)
-			)
+			switch m.state {
+			case selectNoFile:
+				m.NoFile = !m.NoFile
+			case hoveringConfirmButton:
+				m.state = parsing
+				return m, tea.Batch(
+					m.loadingSpinner.Tick,
+					m.parseScriptCmd(),
+				// call parsing functions
+				// change to result view (split view?)
+				)
+			}
 
 		case key.Matches(msg, m.keymap.Quit):
 			m.quitting = true
@@ -156,12 +220,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 	cmds = append(cmds, cmd)
-	// m.Body, cmd = m.Body.Update(msg)
-	// cmds = append(cmds, cmd)
+	m.IdInput, cmd = m.IdInput.Update(msg)
+	cmds = append(cmds, cmd)
 	// m.filepicker, cmd = m.filepicker.Update(msg)
 	// cmds = append(cmds, cmd)
 
-	// switch m.state {
+	switch m.state {
 	// case pickingFile:
 	// 	if didSelect, path := m.filepicker.DidSelectFile(msg); didSelect {
 	// 		m.Attachments.InsertItem(0, attachment(path))
@@ -172,10 +236,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// case editingAttachments:
 	// 	m.Attachments, cmd = m.Attachments.Update(msg)
 	// 	cmds = append(cmds, cmd)
-	// case sendingEmail:
-	// 	m.loadingSpinner, cmd = m.loadingSpinner.Update(msg)
-	// 	cmds = append(cmds, cmd)
-	// }
+	case parsing:
+		m.loadingSpinner, cmd = m.loadingSpinner.Update(msg)
+		cmds = append(cmds, cmd)
+	}
 
 	m.help, cmd = m.help.Update(msg)
 	cmds = append(cmds, cmd)
@@ -189,6 +253,8 @@ func (m Model) View() string {
 	}
 
 	s := ""
+
+	// TODO: Add a caret (>) to whichever state it's currently on
 
 	// Source selection
 	s += m.styles.ActiveLabel.Render("Source: ")
@@ -221,7 +287,7 @@ func (m Model) View() string {
 	}
 	s += "\n"
 
-	IdTypeListText := ""
+	idTypeListText := ""
 	for i, o := range m.atlasIdTypeOptions {
 		title := o.Title
 		desc := o.Description
@@ -236,10 +302,41 @@ func (m Model) View() string {
 			title = m.styles.ItemTitle.Render(title)
 			desc = m.styles.ItemDescription.Render(desc)
 		}
-		IdTypeListText += fmt.Sprintf("%s\n%s\n\n", title, desc)
+		idTypeListText += fmt.Sprintf("%s\n%s\n\n", title, desc)
 	}
-	s += m.styles.ListBlock.Render(IdTypeListText)
+	s += m.styles.ListBlock.Render(idTypeListText)
 	s += "\n"
+
+	// TODO: Weird padding on first line
+	// if int(m.state) < int(enteringIds) {
+	// 	s += m.styles.Disabled.Render("IDs:\n")
+	// } else {
+	// 	s += m.styles.ActiveLabel.Render("IDs:\n")
+	// }
+	s += m.IdInput.View()
+	s += "\n\n"
+
+	// No file checkbox
+	checkboxLabel := "No file:"
+	checkboxDesc := "If checked, print the result directly to the terminal,\notherwise outputs to a csv on the same level as the script.\n(NOTE: This option does nothing currently.)"
+
+	noFileDisabled := int(m.state) < int(selectNoFile)
+	noFileSelected := "[ ]"
+	if m.NoFile {
+		noFileSelected = "[X]"
+	}
+
+	if noFileDisabled {
+		checkboxLabel = m.styles.DisabledItemTitle.Render(checkboxLabel)
+		checkboxDesc = m.styles.DisabledItemDescription.Render(checkboxDesc)
+		noFileSelected = m.styles.DisabledItemTitle.Render(noFileSelected)
+	} else {
+		checkboxLabel = m.styles.ItemTitle.Render(checkboxLabel)
+		checkboxDesc = m.styles.ItemDescription.Render(checkboxDesc)
+		noFileSelected = m.styles.ItemTitle.Render(noFileSelected)
+	}
+	s += fmt.Sprintf("%s %s\n%s", checkboxLabel, noFileSelected, checkboxDesc)
+	s += "\n\n"
 
 	if m.state == hoveringConfirmButton {
 		s += sendButtonActiveStyle.Render("Parse")
@@ -248,8 +345,13 @@ func (m Model) View() string {
 	} else {
 		s += sendButtonStyle.Render("Parse")
 	}
-
 	s += "\n\n"
+
+	if m.state == parsing {
+		s += "\n " + m.loadingSpinner.View() + "Parsing script"
+	}
+	s += "\n\n"
+
 	s += m.help.View(m.keymap)
 
 	return m.styles.Padding.Render(s)
