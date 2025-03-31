@@ -1,22 +1,19 @@
 package main
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// State is the current state of the application.
 type State int
 
 const (
-	hoveringSource State = iota
-	pickingSource
-	editingSourceType
-	editingIds
+	selectSource State = iota
+	selectAtlasIdType
+	enteringIds
 	pickingFile
 	hoveringConfirmButton
 	parsing
@@ -29,29 +26,30 @@ const (
 	local
 )
 
+type AtlasIdType int
+
+const (
+	war AtlasIdType = iota
+	quest
+	script
+)
+
+type ListItem struct {
+	Title       string
+	Description string
+}
+
 type Model struct {
-	// state represents the current state of the application.
-	state State
+	state  State
+	styles Styles
 
 	// Parse from Atlas or local files
-	source      Source
-	SourceInput textinput.Model
+	source        Source
+	sourceOptions []ListItem
 
-	// // To represents the recipient's email address.
-	// // This can be a comma-separated list of addresses.
-	// To textinput.Model
-	// // Subject represents the email's subject.
-	// Subject textinput.Model
-	// // Body represents the email's body.
-	// // This can be written in markdown and will be converted to HTML.
-	// Body textarea.Model
-	// // Attachments represents the email's attachments.
-	// // This is a list of file paths which are picked with a filepicker.
-	// Attachments list.Model
-
-	// showCc bool
-	// Cc     textinput.Model
-	// Bcc    textinput.Model
+	// Atlas ID type
+	atlasIdType        AtlasIdType
+	atlasIdTypeOptions []ListItem
 
 	// // filepicker is used to pick file attachments.
 	// filepicker     filepicker.Model
@@ -63,27 +61,23 @@ type Model struct {
 	// err            error
 }
 
-// NewModel returns a new model for the application.
 func NewModel() Model {
-	sourceInput := textinput.New()
-	sourceInput.Prompt = "Source "
-	// sourceInput.Placeholder = "me@example.com"
-	// sourceInput.PromptStyle = labelStyle.Copy()
-	sourceInput.PromptStyle = labelStyle
-	sourceInput.TextStyle = textStyle
-	sourceInput.Cursor.Style = cursorStyle
-	sourceInput.PlaceholderStyle = placeholderStyle
-	sourceInput.SetValue("Atlas")
-
 	m := Model{
-		state:       hoveringSource,
-		source:      atlas,
-		SourceInput: sourceInput,
-		help:        help.New(),
-		keymap:      DefaultKeybinds(),
+		state:  selectSource,
+		styles: NewStyles(),
+		source: atlas,
+		sourceOptions: []ListItem{
+			{Title: "Atlas", Description: "Parse directly from Atlas IDs"},
+			{Title: "Local", Description: "Parse from local files on your computer"}},
+		atlasIdType: war,
+		atlasIdTypeOptions: []ListItem{
+			{Title: "War", Description: "Parse every script in a war (story chapter or event).\nEx: 100 for Fuyuki"},
+			{Title: "Quest", Description: "Parse every script in a quest (war section or interlude etc).\nEx: 1000001 for Fuyuki chapter 1"},
+			{Title: "Script", Description: "Parse specific scripts individually.\nEx: 0100000111 for Fuyuki chapter 1 post battle scene"},
+		},
+		help:   help.New(),
+		keymap: DefaultKeybinds(),
 	}
-
-	m.focusActiveInput()
 
 	return m
 }
@@ -93,64 +87,54 @@ func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *Model) blurInputs() {
-	m.SourceInput.Blur()
-	// m.To.Blur()
-	// m.Subject.Blur()
-	// m.Body.Blur()
-	// if m.showCc {
-	// 	m.Cc.Blur()
-	// 	m.Bcc.Blur()
-	// }
-	m.SourceInput.PromptStyle = labelStyle
-	// m.To.PromptStyle = labelStyle
-	// if m.showCc {
-	// 	m.Cc.PromptStyle = labelStyle
-	// 	m.Cc.TextStyle = textStyle
-	// 	m.Bcc.PromptStyle = labelStyle
-	// 	m.Bcc.TextStyle = textStyle
-	// }
-	// m.Subject.PromptStyle = labelStyle
-	m.SourceInput.TextStyle = textStyle
-	// m.To.TextStyle = textStyle
-	// m.Subject.TextStyle = textStyle
-	// m.Attachments.Styles.Title = labelStyle
-	// m.Attachments.SetDelegate(attachmentDelegate{false})
-}
-
 // Update is the update loop for the model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.NextInput):
-			m.blurInputs()
-			// Switch to next state
 			switch m.state {
-			case hoveringSource:
+			case selectSource:
+				m.state = selectAtlasIdType
+			case selectAtlasIdType:
 				m.state = hoveringConfirmButton
 			}
-			m.focusActiveInput()
 
 		case key.Matches(msg, m.keymap.PrevInput):
-			m.blurInputs()
-			// Switch to prev state
 			switch m.state {
+			case selectAtlasIdType:
+				m.state = selectSource
 			case hoveringConfirmButton:
-				m.state = hoveringSource
+				m.state = selectAtlasIdType
 			}
-			m.focusActiveInput()
 
-		case key.Matches(msg, m.keymap.SelectSource):
-			// m.state = pickingSource
-			if m.source == atlas {
-				m.source = local
-				m.SourceInput.SetValue("Local")
-			} else {
-				m.source = atlas
-				m.SourceInput.SetValue("Atlas")
+		case key.Matches(msg, m.keymap.NextOption):
+			switch m.state {
+			case selectSource:
+				if m.source == atlas {
+					m.source = local
+				} else {
+					m.source = atlas
+				}
+			case selectAtlasIdType:
+				if int(m.atlasIdType) < len(m.atlasIdTypeOptions)-1 {
+					m.atlasIdType = m.atlasIdType + 1
+				}
 			}
-			// return m, simple list view?
+
+		case key.Matches(msg, m.keymap.PrevOption):
+			switch m.state {
+			case selectSource:
+				if m.source == atlas {
+					m.source = local
+				} else {
+					m.source = atlas
+				}
+			case selectAtlasIdType:
+				if int(m.atlasIdType) > 0 {
+					m.atlasIdType = m.atlasIdType - 1
+				}
+			}
 
 		case key.Matches(msg, m.keymap.Confirm):
 			m.state = parsing
@@ -171,18 +155,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
-	m.SourceInput, cmd = m.SourceInput.Update(msg)
 	cmds = append(cmds, cmd)
-	// m.To, cmd = m.To.Update(msg)
-	// cmds = append(cmds, cmd)
-	// if m.showCc {
-	// 	m.Cc, cmd = m.Cc.Update(msg)
-	// 	cmds = append(cmds, cmd)
-	// 	m.Bcc, cmd = m.Bcc.Update(msg)
-	// 	cmds = append(cmds, cmd)
-	// }
-	// m.Subject, cmd = m.Subject.Update(msg)
-	// cmds = append(cmds, cmd)
 	// m.Body, cmd = m.Body.Update(msg)
 	// cmds = append(cmds, cmd)
 	// m.filepicker, cmd = m.filepicker.Update(msg)
@@ -210,88 +183,74 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// View displays the application.
 func (m Model) View() string {
 	if m.quitting {
 		return ""
 	}
 
-	// switch m.state {
-	// case pickingFile:
-	// 	return "\n" + activeLabelStyle.Render("Attachments") + " " + commentStyle.Render(m.filepicker.CurrentDirectory) +
-	// 		"\n\n" + m.filepicker.View()
-	// case sendingEmail:
-	// 	return "\n " + m.loadingSpinner.View() + "Sending email"
-	// }
+	s := ""
 
-	var s strings.Builder
+	// Source selection
+	s += m.styles.ActiveLabel.Render("Source: ")
+	s += "\n"
 
-	s.WriteString(m.SourceInput.View())
-	s.WriteString("\n")
-	// s.WriteString(m.To.View())
-	// s.WriteString("\n")
-	// if m.showCc {
-	// 	s.WriteString(m.Cc.View())
-	// 	s.WriteString("\n")
-	// 	s.WriteString(m.Bcc.View())
-	// 	s.WriteString("\n")
-	// }
-	// s.WriteString(m.Subject.View())
-	// s.WriteString("\n\n")
-	// s.WriteString(m.Body.View())
-	// s.WriteString("\n\n")
-	// s.WriteString(m.Attachments.View())
-	// s.WriteString("\n")
-	if m.state == hoveringConfirmButton {
-		s.WriteString(sendButtonActiveStyle.Render("Parse"))
-	} else if m.state == hoveringConfirmButton && false {
-		s.WriteString(sendButtonInactiveStyle.Render("Parse"))
+	sourceListText := ""
+	for i, o := range m.sourceOptions {
+		title := o.Title
+		desc := o.Description
+
+		if m.source == Source(i) {
+			title = m.styles.SelectedItemTitle.Render(title)
+			desc = m.styles.SelectedItemDescription.Render(desc)
+		} else {
+			title = m.styles.ItemTitle.Render(title)
+			desc = m.styles.ItemDescription.Render(desc)
+		}
+		sourceListText += fmt.Sprintf("%s\n%s\n\n", title, desc)
+	}
+	s += m.styles.ListBlock.Render(sourceListText)
+	s += "\n"
+
+	// Atlas ID type selection
+	atlasIdTypeDisabled := int(m.state) < int(selectAtlasIdType)
+
+	if atlasIdTypeDisabled {
+		s += m.styles.Disabled.Render("ID type: ")
 	} else {
-		s.WriteString(sendButtonStyle.Render("Parse"))
+		s += m.styles.ActiveLabel.Render("ID type: ")
 	}
-	s.WriteString("\n\n")
-	s.WriteString(m.help.View(m.keymap))
+	s += "\n"
 
-	// if m.err != nil {
-	// 	s.WriteString("\n\n")
-	// 	s.WriteString(errorStyle.Render(m.err.Error()))
-	// }
+	IdTypeListText := ""
+	for i, o := range m.atlasIdTypeOptions {
+		title := o.Title
+		desc := o.Description
 
-	return paddedStyle.Render(s.String())
-}
-
-func (m *Model) focusActiveInput() {
-	switch m.state {
-	case hoveringSource:
-		m.SourceInput.PromptStyle = activeLabelStyle
-		m.SourceInput.TextStyle = activeTextStyle
-		m.SourceInput.Focus()
-		m.SourceInput.CursorEnd()
-		// case editingTo:
-		// 	m.To.PromptStyle = activeLabelStyle
-		// 	m.To.TextStyle = activeTextStyle
-		// 	m.To.Focus()
-		// 	m.To.CursorEnd()
-		// case editingCc:
-		// 	m.Cc.PromptStyle = activeLabelStyle
-		// 	m.Cc.TextStyle = activeTextStyle
-		// 	m.Cc.Focus()
-		// 	m.Cc.CursorEnd()
-		// case editingBcc:
-		// 	m.Bcc.PromptStyle = activeLabelStyle
-		// 	m.Bcc.TextStyle = activeTextStyle
-		// 	m.Bcc.Focus()
-		// 	m.Bcc.CursorEnd()
-		// case editingSubject:
-		// 	m.Subject.PromptStyle = activeLabelStyle
-		// 	m.Subject.TextStyle = activeTextStyle
-		// 	m.Subject.Focus()
-		// 	m.Subject.CursorEnd()
-		// case editingBody:
-		// 	m.Body.Focus()
-		// 	m.Body.CursorEnd()
-		// case editingAttachments:
-		// 	m.Attachments.Styles.Title = activeLabelStyle
-		// 	m.Attachments.SetDelegate(attachmentDelegate{true})
+		if atlasIdTypeDisabled {
+			title = m.styles.DisabledItemTitle.Render(title)
+			desc = m.styles.DisabledItemDescription.Render(desc)
+		} else if m.atlasIdType == AtlasIdType(i) {
+			title = m.styles.SelectedItemTitle.Render(title)
+			desc = m.styles.SelectedItemDescription.Render(desc)
+		} else {
+			title = m.styles.ItemTitle.Render(title)
+			desc = m.styles.ItemDescription.Render(desc)
+		}
+		IdTypeListText += fmt.Sprintf("%s\n%s\n\n", title, desc)
 	}
+	s += m.styles.ListBlock.Render(IdTypeListText)
+	s += "\n"
+
+	if m.state == hoveringConfirmButton {
+		s += sendButtonActiveStyle.Render("Parse")
+	} else if m.state == hoveringConfirmButton && false {
+		s += sendButtonInactiveStyle.Render("Parse")
+	} else {
+		s += sendButtonStyle.Render("Parse")
+	}
+
+	s += "\n\n"
+	s += m.help.View(m.keymap)
+
+	return m.styles.Padding.Render(s)
 }

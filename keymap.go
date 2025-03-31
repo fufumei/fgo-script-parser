@@ -4,10 +4,11 @@ import "github.com/charmbracelet/bubbles/key"
 
 // KeyMap represents the key bindings for the application.
 type KeyMap struct {
-	NextInput    key.Binding
-	PrevInput    key.Binding
-	SelectSource key.Binding
-	Confirm      key.Binding
+	NextInput  key.Binding
+	PrevInput  key.Binding
+	NextOption key.Binding
+	PrevOption key.Binding
+	Confirm    key.Binding
 	// Send      key.Binding
 	// Attach    key.Binding
 	// Unattach  key.Binding
@@ -26,14 +27,15 @@ func DefaultKeybinds() KeyMap {
 			key.WithKeys("shift+tab"),
 			key.WithHelp("shift+tab", "prev"),
 		),
-		SelectSource: key.NewBinding(
-			key.WithKeys("enter"),
-			key.WithHelp("enter", "toggle source"),
-			key.WithDisabled(),
+		NextOption: key.NewBinding(
+			key.WithKeys("down"),
+		),
+		PrevOption: key.NewBinding(
+			key.WithKeys("up"),
 		),
 		Confirm: key.NewBinding(
 			key.WithKeys("enter"),
-			key.WithHelp("enter", "parse scripts"),
+			key.WithHelp("enter", "parse"),
 			key.WithDisabled(),
 		),
 		// Attach: key.NewBinding(
@@ -62,8 +64,7 @@ func DefaultKeybinds() KeyMap {
 func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		k.NextInput,
-		k.Quit,
-		k.SelectSource,
+		k.PrevInput,
 		k.Confirm,
 		k.Quit,
 	}
@@ -72,12 +73,15 @@ func (k KeyMap) ShortHelp() []key.Binding {
 // FullHelp returns the key bindings for the full help screen.
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.NextInput, k.SelectSource, k.Confirm, k.Quit},
+		{k.NextInput, k.Confirm, k.Quit},
 	}
 }
 
 func (m *Model) updateKeymap() {
-	m.keymap.SelectSource.SetEnabled(m.state == hoveringSource)
+	m.keymap.NextInput.SetEnabled(m.state != hoveringConfirmButton)
+	m.keymap.PrevInput.SetEnabled(m.state != selectSource)
+	m.keymap.NextOption.SetEnabled(m.state == selectSource || m.state == selectAtlasIdType)
+	m.keymap.PrevOption.SetEnabled(m.state == selectSource || m.state == selectAtlasIdType)
 	m.keymap.Confirm.SetEnabled(m.state == hoveringConfirmButton)
 	// m.keymap.Unattach.SetEnabled(m.state == editingAttachments && len(m.Attachments.Items()) > 0)
 	// m.keymap.Back.SetEnabled(m.state == pickingFile)
