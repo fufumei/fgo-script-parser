@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alecthomas/kong"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-zoox/fetch"
 	"golang.org/x/exp/slices"
 )
@@ -32,15 +32,21 @@ var CLI struct {
 }
 
 func main() {
-	ctx := kong.Parse(&CLI)
-	switch ctx.Command() {
-	case "atlas":
-		ParseFromAtlas()
-	case "local <path>":
-		ParseFromLocal()
-	default:
-		panic(ctx.Command())
+	p := tea.NewProgram(NewModel(), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Alas, there's been an error: %v", err)
+		os.Exit(1)
 	}
+
+	// ctx := kong.Parse(&CLI)
+	// switch ctx.Command() {
+	// case "atlas":
+	// 	ParseFromAtlas()
+	// case "local <path>":
+	// 	ParseFromLocal()
+	// default:
+	// 	panic(ctx.Command())
+	// }
 }
 
 func ParseFromAtlas() {
