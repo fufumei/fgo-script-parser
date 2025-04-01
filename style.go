@@ -33,6 +33,12 @@ type Styles struct {
 
 	CheckboxLabel       lipgloss.Style
 	CheckboxDescription lipgloss.Style
+
+	SendButtonActiveStyle   lipgloss.Style
+	SendButtonInactiveStyle lipgloss.Style
+	SendButtonStyle         lipgloss.Style
+
+	Error lipgloss.Style
 }
 
 func NewStyles() (s Styles) {
@@ -62,20 +68,11 @@ func NewStyles() (s Styles) {
 	s.Text = lipgloss.NewStyle().Foreground(lightGrayColor)
 	s.Cursor = lipgloss.NewStyle().Foreground(whiteColor)
 
+	s.SendButtonActiveStyle = lipgloss.NewStyle().Background(labelColor).Foreground(yellowColor).Padding(0, 2)
+	s.SendButtonInactiveStyle = lipgloss.NewStyle().Background(darkGrayColor).Foreground(lightGrayColor).Padding(0, 2)
+	s.SendButtonStyle = lipgloss.NewStyle().Background(darkGrayColor).Foreground(grayColor).Padding(0, 2)
+
+	s.Error = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F87"))
+
 	return s
 }
-
-var (
-	disabledStyle = lipgloss.NewStyle().Foreground(grayColor)
-
-	errorHeaderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F1F1F1")).Background(lipgloss.Color("#FF5F87")).Bold(true).Padding(0, 1).SetString("ERROR")
-	errorStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F87"))
-	commentStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#757575")).PaddingLeft(1)
-
-	sendButtonActiveStyle   = lipgloss.NewStyle().Background(labelColor).Foreground(yellowColor).Padding(0, 2)
-	sendButtonInactiveStyle = lipgloss.NewStyle().Background(darkGrayColor).Foreground(lightGrayColor).Padding(0, 2)
-	sendButtonStyle         = lipgloss.NewStyle().Background(darkGrayColor).Foreground(grayColor).Padding(0, 2)
-
-	inlineCodeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F87")).Background(lipgloss.Color("#3A3A3A")).Padding(0, 1)
-	linkStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("#00AF87")).Underline(true)
-)

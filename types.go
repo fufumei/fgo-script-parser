@@ -1,5 +1,39 @@
 package main
 
+// TUI types
+type State int
+
+const (
+	selectSource State = iota
+	selectAtlasIdType
+	enteringIds
+	pickingFile
+	selectNoFile
+	hoveringConfirmButton
+	parsing
+)
+
+type Source int
+
+const (
+	atlas Source = iota
+	local
+)
+
+type AtlasIdType int
+
+const (
+	war AtlasIdType = iota
+	quest
+	script
+)
+
+type ListItem struct {
+	Title       string
+	Description string
+}
+
+// Parsing types
 type Script struct {
 	ScriptId string `json:"scriptId"`
 	Script   string `json:"script"`

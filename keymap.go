@@ -2,13 +2,13 @@ package main
 
 import "github.com/charmbracelet/bubbles/key"
 
-// KeyMap represents the key bindings for the application.
 type KeyMap struct {
 	NextInput  key.Binding
 	PrevInput  key.Binding
 	NextOption key.Binding
 	PrevOption key.Binding
 	Confirm    key.Binding
+	Toggle     key.Binding
 	// Send      key.Binding
 	// Attach    key.Binding
 	// Unattach  key.Binding
@@ -16,7 +16,6 @@ type KeyMap struct {
 	Quit key.Binding
 }
 
-// DefaultKeybinds returns the default key bindings for the application.
 func DefaultKeybinds() KeyMap {
 	return KeyMap{
 		NextInput: key.NewBinding(
@@ -32,6 +31,11 @@ func DefaultKeybinds() KeyMap {
 		),
 		PrevOption: key.NewBinding(
 			key.WithKeys("up"),
+		),
+		Toggle: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "toggle"),
+			key.WithDisabled(),
 		),
 		Confirm: key.NewBinding(
 			key.WithKeys("enter"),
@@ -65,6 +69,7 @@ func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		k.NextInput,
 		k.PrevInput,
+		k.Toggle,
 		k.Confirm,
 		k.Quit,
 	}
@@ -82,7 +87,8 @@ func (m *Model) updateKeymap() {
 	m.keymap.PrevInput.SetEnabled(m.state != selectSource)
 	m.keymap.NextOption.SetEnabled(m.state == selectSource || m.state == selectAtlasIdType)
 	m.keymap.PrevOption.SetEnabled(m.state == selectSource || m.state == selectAtlasIdType)
-	m.keymap.Confirm.SetEnabled(m.state == hoveringConfirmButton || m.state == selectNoFile)
+	m.keymap.Confirm.SetEnabled(m.state == hoveringConfirmButton)
+	m.keymap.Toggle.SetEnabled(m.state == selectNoFile)
 	// m.keymap.Unattach.SetEnabled(m.state == editingAttachments && len(m.Attachments.Items()) > 0)
 	// m.keymap.Back.SetEnabled(m.state == pickingFile)
 

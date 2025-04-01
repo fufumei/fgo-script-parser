@@ -2,45 +2,14 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 )
-
-type State int
-
-const (
-	selectSource State = iota
-	selectAtlasIdType
-	enteringIds
-	pickingFile
-	selectNoFile
-	hoveringConfirmButton
-	parsing
-)
-
-type Source int
-
-const (
-	atlas Source = iota
-	local
-)
-
-type AtlasIdType int
-
-const (
-	war AtlasIdType = iota
-	quest
-	script
-)
-
-type ListItem struct {
-	Title       string
-	Description string
-}
 
 type Model struct {
 	state  State
@@ -55,7 +24,7 @@ type Model struct {
 	atlasIdTypeOptions []ListItem
 
 	// ID list for atlas parsing
-	IdInput textinput.Model
+	IdInput textarea.Model
 
 	// filepicker for local parsing.
 	// filepicker     filepicker.Model
@@ -68,24 +37,25 @@ type Model struct {
 	keymap         KeyMap
 	quitting       bool
 	abort          bool
+	err            error
 }
 
 func NewModel() Model {
 	styles := NewStyles()
 
-	body := textinput.New()
-	// body.ShowLineNumbers = false
-	// body.FocusedStyle.CursorLine = styles.ActiveText
-	// body.FocusedStyle.Prompt = styles.ActiveLabel
-	// body.FocusedStyle.Text = styles.ActiveText
-	// body.BlurredStyle.CursorLine = styles.Text
-	// body.BlurredStyle.Text = styles.Text
-	// body.Cursor.Style = styles.Cursor
-	body.Prompt = "ID: "
-	body.Placeholder = "_ "
-	body.PromptStyle = styles.Disabled
+	body := textarea.New()
+	body.ShowLineNumbers = false
+	body.FocusedStyle.CursorLine = styles.ActiveText
+	body.FocusedStyle.Prompt = styles.ActiveLabel
+	body.FocusedStyle.Text = styles.ActiveText
+	body.BlurredStyle.CursorLine = styles.Text
+	body.BlurredStyle.Text = styles.Text
 	body.Cursor.Style = styles.Cursor
-	body.TextStyle = styles.Text
+	// body.Prompt = "ID: "
+	// body.Placeholder = "_ "
+	// body.PromptStyle = styles.Disabled
+	// body.Cursor.Style = styles.Cursor
+	// body.TextStyle = styles.Text
 
 	loadingSpinner := spinner.New()
 	loadingSpinner.Style = styles.ActiveLabel
@@ -114,19 +84,43 @@ func NewModel() Model {
 	return m
 }
 
-// Init initializes the model.
 func (m Model) Init() tea.Cmd {
 	return nil
+}
+
+type clearErrMsg struct{}
+
+func clearErrAfter(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(t time.Time) tea.Msg {
+		return clearErrMsg{}
+	})
+}
+
+func (m *Model) blurInputs() {
+	m.IdInput.Blur()
+}
+
+func (m *Model) focusActiveInput() {
+	// m.IdInput.PromptStyle = m.styles.ActiveLabel
+	// m.IdInput.TextStyle = m.styles.ActiveText
+	m.IdInput.Focus()
+	m.IdInput.CursorEnd()
+
 }
 
 // Update is the update loop for the model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case parseSuccessMsg:
-		{
-			m.quitting = true
-			return m, tea.Quit
-		}
+		// TODO: Display results in a table (bubbles)
+		m.quitting = true
+		return m, tea.Quit
+	case parseFailureMsg:
+		// m.blurInputs()
+		// m.state = editingFrom
+		// m.focusActiveInput()
+		m.err = msg
+		return m, clearErrAfter(10 * time.Second)
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.NextInput):
@@ -136,8 +130,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case selectAtlasIdType:
 				m.state = enteringIds
 
-				m.IdInput.PromptStyle = m.styles.ActiveLabel
-				m.IdInput.TextStyle = m.styles.ActiveText
+				// m.IdInput.PromptStyle = m.styles.ActiveLabel
+				// m.IdInput.TextStyle = m.styles.ActiveText
 				m.IdInput.Focus()
 				m.IdInput.CursorEnd()
 			case enteringIds:
@@ -154,12 +148,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case enteringIds:
 				m.IdInput.Blur()
 				m.state = selectAtlasIdType
-				m.IdInput.PromptStyle = m.styles.Disabled
-				m.IdInput.TextStyle = m.styles.Text
+				// m.IdInput.PromptStyle = m.styles.Disabled
+				// m.IdInput.TextStyle = m.styles.Text
 			case selectNoFile:
 				m.state = enteringIds
-				m.IdInput.PromptStyle = m.styles.ActiveLabel
-				m.IdInput.TextStyle = m.styles.ActiveText
+				// m.IdInput.PromptStyle = m.styles.ActiveLabel
+				// m.IdInput.TextStyle = m.styles.ActiveText
 				m.IdInput.Focus()
 				m.IdInput.CursorEnd()
 			case hoveringConfirmButton:
@@ -194,19 +188,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
+		case key.Matches(msg, m.keymap.Toggle):
+			m.NoFile = !m.NoFile
+
 		case key.Matches(msg, m.keymap.Confirm):
-			switch m.state {
-			case selectNoFile:
-				m.NoFile = !m.NoFile
-			case hoveringConfirmButton:
-				m.state = parsing
-				return m, tea.Batch(
-					m.loadingSpinner.Tick,
-					m.parseScriptCmd(),
-				// call parsing functions
-				// change to result view (split view?)
-				)
-			}
+			m.state = parsing
+			return m, tea.Batch(
+				m.loadingSpinner.Tick,
+				m.parseScriptCmd(),
+			)
 
 		case key.Matches(msg, m.keymap.Quit):
 			m.quitting = true
@@ -339,11 +329,11 @@ func (m Model) View() string {
 	s += "\n\n"
 
 	if m.state == hoveringConfirmButton {
-		s += sendButtonActiveStyle.Render("Parse")
+		s += m.styles.SendButtonActiveStyle.Render("Parse")
 	} else if m.state == hoveringConfirmButton && false {
-		s += sendButtonInactiveStyle.Render("Parse")
+		s += m.styles.SendButtonInactiveStyle.Render("Parse")
 	} else {
-		s += sendButtonStyle.Render("Parse")
+		s += m.styles.SendButtonStyle.Render("Parse")
 	}
 	s += "\n\n"
 
@@ -353,6 +343,11 @@ func (m Model) View() string {
 	s += "\n\n"
 
 	s += m.help.View(m.keymap)
+
+	if m.err != nil {
+		s += "\n\n"
+		s += m.styles.Error.Render(m.err.Error())
+	}
 
 	return m.styles.Padding.Render(s)
 }
