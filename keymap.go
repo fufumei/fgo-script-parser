@@ -83,12 +83,12 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 }
 
 func (m *Model) updateKeymap() {
-	m.keymap.NextInput.SetEnabled(m.state != hoveringConfirmButton)
-	m.keymap.PrevInput.SetEnabled(m.state != selectSource)
-	m.keymap.NextOption.SetEnabled(m.state == selectSource || m.state == selectAtlasIdType)
-	m.keymap.PrevOption.SetEnabled(m.state == selectSource || m.state == selectAtlasIdType)
-	m.keymap.Confirm.SetEnabled(m.state == hoveringConfirmButton)
-	m.keymap.Toggle.SetEnabled(m.state == selectNoFile)
+	m.keymap.NextInput.SetEnabled(m.state != ConfirmButton)
+	m.keymap.PrevInput.SetEnabled(m.state != SourceSelect)
+	m.keymap.NextOption.SetEnabled(m.state == SourceSelect || m.state == AtlasTypeSelect)
+	m.keymap.PrevOption.SetEnabled(m.state == SourceSelect || m.state == AtlasTypeSelect)
+	m.keymap.Confirm.SetEnabled(m.state == ConfirmButton)
+	m.keymap.Toggle.SetEnabled(m.state == MiscOptions)
 	// m.keymap.Unattach.SetEnabled(m.state == editingAttachments && len(m.Attachments.Items()) > 0)
 	// m.keymap.Back.SetEnabled(m.state == pickingFile)
 

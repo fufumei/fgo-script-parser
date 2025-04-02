@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type Model struct {
@@ -46,23 +47,18 @@ func NewModel() Model {
 	body := textarea.New()
 	body.ShowLineNumbers = false
 	body.FocusedStyle.CursorLine = styles.ActiveText
-	body.FocusedStyle.Prompt = styles.ActiveLabel
+	body.FocusedStyle.Prompt = styles.CurrentLabel
 	body.FocusedStyle.Text = styles.ActiveText
 	body.BlurredStyle.CursorLine = styles.Text
 	body.BlurredStyle.Text = styles.Text
 	body.Cursor.Style = styles.Cursor
-	// body.Prompt = "ID: "
-	// body.Placeholder = "_ "
-	// body.PromptStyle = styles.Disabled
-	// body.Cursor.Style = styles.Cursor
-	// body.TextStyle = styles.Text
 
 	loadingSpinner := spinner.New()
-	loadingSpinner.Style = styles.ActiveLabel
+	loadingSpinner.Style = styles.CurrentLabel
 	loadingSpinner.Spinner = spinner.Dot
 
 	m := Model{
-		state:  selectSource,
+		state:  SourceSelect,
 		styles: styles,
 		source: atlas,
 		sourceOptions: []ListItem{
@@ -96,19 +92,6 @@ func clearErrAfter(d time.Duration) tea.Cmd {
 	})
 }
 
-func (m *Model) blurInputs() {
-	m.IdInput.Blur()
-}
-
-func (m *Model) focusActiveInput() {
-	// m.IdInput.PromptStyle = m.styles.ActiveLabel
-	// m.IdInput.TextStyle = m.styles.ActiveText
-	m.IdInput.Focus()
-	m.IdInput.CursorEnd()
-
-}
-
-// Update is the update loop for the model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case parseSuccessMsg:
@@ -116,59 +99,49 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.quitting = true
 		return m, tea.Quit
 	case parseFailureMsg:
-		// m.blurInputs()
-		// m.state = editingFrom
-		// m.focusActiveInput()
 		m.err = msg
 		return m, clearErrAfter(10 * time.Second)
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.NextInput):
 			switch m.state {
-			case selectSource:
-				m.state = selectAtlasIdType
-			case selectAtlasIdType:
-				m.state = enteringIds
-
-				// m.IdInput.PromptStyle = m.styles.ActiveLabel
-				// m.IdInput.TextStyle = m.styles.ActiveText
+			case SourceSelect:
+				m.state = AtlasTypeSelect
+			case AtlasTypeSelect:
+				m.state = IdInput
 				m.IdInput.Focus()
 				m.IdInput.CursorEnd()
-			case enteringIds:
+			case IdInput:
 				m.IdInput.Blur()
-				m.state = selectNoFile
-			case selectNoFile:
-				m.state = hoveringConfirmButton
+				m.state = MiscOptions
+			case MiscOptions:
+				m.state = ConfirmButton
 			}
 
 		case key.Matches(msg, m.keymap.PrevInput):
 			switch m.state {
-			case selectAtlasIdType:
-				m.state = selectSource
-			case enteringIds:
+			case AtlasTypeSelect:
+				m.state = SourceSelect
+			case IdInput:
 				m.IdInput.Blur()
-				m.state = selectAtlasIdType
-				// m.IdInput.PromptStyle = m.styles.Disabled
-				// m.IdInput.TextStyle = m.styles.Text
-			case selectNoFile:
-				m.state = enteringIds
-				// m.IdInput.PromptStyle = m.styles.ActiveLabel
-				// m.IdInput.TextStyle = m.styles.ActiveText
+				m.state = AtlasTypeSelect
+			case MiscOptions:
+				m.state = IdInput
 				m.IdInput.Focus()
 				m.IdInput.CursorEnd()
-			case hoveringConfirmButton:
-				m.state = selectNoFile
+			case ConfirmButton:
+				m.state = MiscOptions
 			}
 
 		case key.Matches(msg, m.keymap.NextOption):
 			switch m.state {
-			case selectSource:
+			case SourceSelect:
 				if m.source == atlas {
 					m.source = local
 				} else {
 					m.source = atlas
 				}
-			case selectAtlasIdType:
+			case AtlasTypeSelect:
 				if int(m.atlasIdType) < len(m.atlasIdTypeOptions)-1 {
 					m.atlasIdType = m.atlasIdType + 1
 				}
@@ -176,13 +149,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, m.keymap.PrevOption):
 			switch m.state {
-			case selectSource:
+			case SourceSelect:
 				if m.source == atlas {
 					m.source = local
 				} else {
 					m.source = atlas
 				}
-			case selectAtlasIdType:
+			case AtlasTypeSelect:
 				if int(m.atlasIdType) > 0 {
 					m.atlasIdType = m.atlasIdType - 1
 				}
@@ -192,7 +165,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.NoFile = !m.NoFile
 
 		case key.Matches(msg, m.keymap.Confirm):
-			m.state = parsing
+			m.state = Parsing
 			return m, tea.Batch(
 				m.loadingSpinner.Tick,
 				m.parseScriptCmd(),
@@ -226,7 +199,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// case editingAttachments:
 	// 	m.Attachments, cmd = m.Attachments.Update(msg)
 	// 	cmds = append(cmds, cmd)
-	case parsing:
+	case Parsing:
 		m.loadingSpinner, cmd = m.loadingSpinner.Update(msg)
 		cmds = append(cmds, cmd)
 	}
@@ -242,15 +215,53 @@ func (m Model) View() string {
 		return ""
 	}
 
-	s := ""
+	var (
+		sourceHeader string
+		sourceList   []string
+		sourceRender string
 
-	// TODO: Add a caret (>) to whichever state it's currently on
+		atlasTypeHeader string
+		atlasTypeList   []string
+		atlasTypeRender string
 
-	// Source selection
-	s += m.styles.ActiveLabel.Render("Source: ")
-	s += "\n"
+		idInputHeader string
+		idInputRender string
 
-	sourceListText := ""
+		miscOptionsHeader string
+		miscOptionsList   []string
+		miscOptionsRender string
+
+		noFileRender string
+
+		confirmButtonRender string
+	)
+	currentHeader := "> "
+	uncheckedBox := "[ ] "
+	checkedBox := "[X] "
+	sourceHeaderText := "Source "
+	atlasTypeHeaderText := "Source Type "
+	idInputHeaderText := "IDs "
+	miscOptionsHeaderText := "Options "
+	noFileHeaderText := "No file:"
+	noFileHeaderDescText := "If checked, print the result directly to the terminal,\notherwise outputs to a csv on the same level as the script.\n(NOTE: This option does nothing currently.)"
+	confirmButtonText := "Parse"
+
+	// 	 0: current state
+	// < 0: previous state
+	// > 0: upcoming state
+	atlasTypeState := int(AtlasTypeSelect) - int(m.state)
+	idInputState := int(IdInput) - int(m.state)
+	miscOptionsState := int(MiscOptions) - int(m.state)
+	confirmButtonState := int(ConfirmButton) - int(m.state)
+
+	// ------------------------ //
+
+	if m.state == SourceSelect {
+		sourceHeader = m.styles.CurrentLabel.Render(currentHeader + sourceHeaderText)
+	} else {
+		sourceHeader = m.styles.PreviousLabel.Render(sourceHeaderText)
+	}
+
 	for i, o := range m.sourceOptions {
 		title := o.Title
 		desc := o.Description
@@ -262,92 +273,152 @@ func (m Model) View() string {
 			title = m.styles.ItemTitle.Render(title)
 			desc = m.styles.ItemDescription.Render(desc)
 		}
-		sourceListText += fmt.Sprintf("%s\n%s\n\n", title, desc)
+		sourceList = append(sourceList, fmt.Sprintf("%s\n%s\n", title, desc))
 	}
-	s += m.styles.ListBlock.Render(sourceListText)
-	s += "\n"
 
-	// Atlas ID type selection
-	atlasIdTypeDisabled := int(m.state) < int(selectAtlasIdType)
+	sourceRender =
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			sourceHeader,
+			m.styles.ListBlock.Render(
+				lipgloss.JoinVertical(
+					lipgloss.Left,
+					sourceList...,
+				)),
+		)
 
-	if atlasIdTypeDisabled {
-		s += m.styles.Disabled.Render("ID type: ")
-	} else {
-		s += m.styles.ActiveLabel.Render("ID type: ")
+	switch {
+	case atlasTypeState < 0:
+		atlasTypeHeader = m.styles.PreviousLabel.Render(atlasTypeHeaderText)
+	case atlasTypeState > 0:
+		atlasTypeHeader = m.styles.Disabled.Render(atlasTypeHeaderText)
+	case atlasTypeState == 0:
+		atlasTypeHeader = m.styles.CurrentLabel.Render(currentHeader + atlasTypeHeaderText)
 	}
-	s += "\n"
 
-	idTypeListText := ""
 	for i, o := range m.atlasIdTypeOptions {
 		title := o.Title
 		desc := o.Description
 
-		if atlasIdTypeDisabled {
+		switch {
+		case atlasTypeState < 0:
+			if m.atlasIdType == AtlasIdType(i) {
+				title = m.styles.SelectedItemTitle.Render(title)
+				desc = m.styles.SelectedItemDescription.Render(desc)
+			} else {
+				title = m.styles.ItemTitle.Render(title)
+				desc = m.styles.ItemDescription.Render(desc)
+			}
+		case atlasTypeState > 0:
 			title = m.styles.DisabledItemTitle.Render(title)
 			desc = m.styles.DisabledItemDescription.Render(desc)
-		} else if m.atlasIdType == AtlasIdType(i) {
-			title = m.styles.SelectedItemTitle.Render(title)
-			desc = m.styles.SelectedItemDescription.Render(desc)
-		} else {
-			title = m.styles.ItemTitle.Render(title)
-			desc = m.styles.ItemDescription.Render(desc)
+		case atlasTypeState == 0:
+			if m.atlasIdType == AtlasIdType(i) {
+				title = m.styles.SelectedItemTitle.Render(title)
+				desc = m.styles.SelectedItemDescription.Render(desc)
+			} else {
+				title = m.styles.ItemTitle.Render(title)
+				desc = m.styles.ItemDescription.Render(desc)
+			}
+
 		}
-		idTypeListText += fmt.Sprintf("%s\n%s\n\n", title, desc)
+
+		atlasTypeList = append(atlasTypeList, fmt.Sprintf("%s\n%s\n", title, desc))
 	}
-	s += m.styles.ListBlock.Render(idTypeListText)
-	s += "\n"
 
-	// TODO: Weird padding on first line
-	// if int(m.state) < int(enteringIds) {
-	// 	s += m.styles.Disabled.Render("IDs:\n")
-	// } else {
-	// 	s += m.styles.ActiveLabel.Render("IDs:\n")
-	// }
-	s += m.IdInput.View()
-	s += "\n\n"
+	atlasTypeRender =
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			atlasTypeHeader,
+			m.styles.ListBlock.Render(
+				lipgloss.JoinVertical(
+					lipgloss.Left,
+					atlasTypeList...,
+				)),
+		)
 
-	// No file checkbox
-	checkboxLabel := "No file:"
-	checkboxDesc := "If checked, print the result directly to the terminal,\notherwise outputs to a csv on the same level as the script.\n(NOTE: This option does nothing currently.)"
+	switch {
+	case idInputState < 0:
+		idInputHeader = m.styles.PreviousLabel.Render(idInputHeaderText)
+	case idInputState > 0:
+		idInputHeader = m.styles.Disabled.Render(idInputHeaderText)
+	case idInputState == 0:
+		idInputHeader = m.styles.CurrentLabel.Render(currentHeader + idInputHeaderText)
+	}
 
-	noFileDisabled := int(m.state) < int(selectNoFile)
-	noFileSelected := "[ ]"
+	idInputRender =
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			idInputHeader,
+			m.IdInput.View(),
+		)
+
+	noFileCheckbox := uncheckedBox
 	if m.NoFile {
-		noFileSelected = "[X]"
+		noFileCheckbox = checkedBox
 	}
 
-	if noFileDisabled {
-		checkboxLabel = m.styles.DisabledItemTitle.Render(checkboxLabel)
-		checkboxDesc = m.styles.DisabledItemDescription.Render(checkboxDesc)
-		noFileSelected = m.styles.DisabledItemTitle.Render(noFileSelected)
-	} else {
-		checkboxLabel = m.styles.ItemTitle.Render(checkboxLabel)
-		checkboxDesc = m.styles.ItemDescription.Render(checkboxDesc)
-		noFileSelected = m.styles.ItemTitle.Render(noFileSelected)
-	}
-	s += fmt.Sprintf("%s %s\n%s", checkboxLabel, noFileSelected, checkboxDesc)
-	s += "\n\n"
-
-	if m.state == hoveringConfirmButton {
-		s += m.styles.SendButtonActiveStyle.Render("Parse")
-	} else if m.state == hoveringConfirmButton && false {
-		s += m.styles.SendButtonInactiveStyle.Render("Parse")
-	} else {
-		s += m.styles.SendButtonStyle.Render("Parse")
-	}
-	s += "\n\n"
-
-	if m.state == parsing {
-		s += "\n " + m.loadingSpinner.View() + "Parsing script"
-	}
-	s += "\n\n"
-
-	s += m.help.View(m.keymap)
-
-	if m.err != nil {
-		s += "\n\n"
-		s += m.styles.Error.Render(m.err.Error())
+	switch {
+	case miscOptionsState < 0:
+		miscOptionsHeader = m.styles.PreviousLabel.Render(miscOptionsHeaderText)
+		noFileRender = lipgloss.JoinVertical(
+			lipgloss.Left,
+			m.styles.PreviousLabel.Render(noFileCheckbox+noFileHeaderText),
+			m.styles.PreviousLabel.Render(noFileHeaderDescText),
+		)
+		miscOptionsList = append(miscOptionsList, noFileRender)
+	case miscOptionsState > 0:
+		miscOptionsHeader = m.styles.Disabled.Render(miscOptionsHeaderText)
+		noFileRender = lipgloss.JoinVertical(
+			lipgloss.Left,
+			m.styles.Disabled.Render(noFileCheckbox+noFileHeaderText),
+			m.styles.Disabled.Render(noFileHeaderDescText),
+		)
+		miscOptionsList = append(miscOptionsList, noFileRender)
+	case miscOptionsState == 0:
+		miscOptionsHeader = m.styles.CurrentLabel.Render(miscOptionsHeaderText)
+		noFileRender = lipgloss.JoinVertical(
+			lipgloss.Left,
+			m.styles.SelectedItemTitle.Render(currentHeader+noFileCheckbox+noFileHeaderText),
+			m.styles.SelectedItemDescription.Render(noFileHeaderDescText),
+		)
+		miscOptionsList = append(miscOptionsList, noFileRender)
 	}
 
-	return m.styles.Padding.Render(s)
+	miscOptionsRender =
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			miscOptionsHeader,
+			lipgloss.JoinHorizontal(
+				lipgloss.Bottom,
+				miscOptionsList...,
+			),
+		)
+
+	switch {
+	case confirmButtonState > 0:
+		confirmButtonRender = m.styles.SendButtonStyle.Render(confirmButtonText)
+	case confirmButtonState == 0:
+		confirmButtonRender = m.styles.SendButtonActiveStyle.Render(confirmButtonText)
+	}
+
+	parsingRender := ""
+	if m.state == Parsing {
+		parsingRender = m.loadingSpinner.View() + "Parsing script"
+	}
+
+	return m.styles.Padding.Render(lipgloss.JoinVertical(
+		lipgloss.Left,
+		sourceRender,
+		atlasTypeRender,
+		idInputRender,
+		"\n",
+		miscOptionsRender,
+		"\n",
+		confirmButtonRender,
+		parsingRender,
+		m.help.View(m.keymap),
+		"\n",
+		m.styles.Error.Render(m.err.Error()),
+	))
 }

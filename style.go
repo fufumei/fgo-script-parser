@@ -16,7 +16,8 @@ type Styles struct {
 
 	Disabled lipgloss.Style
 
-	ActiveLabel lipgloss.Style
+	CurrentLabel  lipgloss.Style
+	PreviousLabel lipgloss.Style
 
 	ListBlock               lipgloss.Style
 	ListItem                lipgloss.Style
@@ -46,7 +47,8 @@ func NewStyles() (s Styles) {
 
 	s.Disabled = lipgloss.NewStyle().Foreground(grayColor)
 
-	s.ActiveLabel = lipgloss.NewStyle().Foreground(labelColor)
+	s.CurrentLabel = lipgloss.NewStyle().Foreground(labelColor)
+	s.PreviousLabel = lipgloss.NewStyle().Foreground(whiteColor)
 
 	s.ListBlock = lipgloss.NewStyle().PaddingLeft(2)
 	s.ItemTitle = lipgloss.NewStyle().

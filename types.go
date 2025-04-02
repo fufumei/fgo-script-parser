@@ -4,13 +4,13 @@ package main
 type State int
 
 const (
-	selectSource State = iota
-	selectAtlasIdType
-	enteringIds
-	pickingFile
-	selectNoFile
-	hoveringConfirmButton
-	parsing
+	SourceSelect State = iota
+	AtlasTypeSelect
+	IdInput
+	// FileSelect
+	MiscOptions
+	ConfirmButton
+	Parsing
 )
 
 type Source int
