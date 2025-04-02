@@ -39,7 +39,10 @@ type Styles struct {
 	SendButtonInactiveStyle lipgloss.Style
 	SendButtonStyle         lipgloss.Style
 
-	Error lipgloss.Style
+	Error        lipgloss.Style
+	CommentStyle lipgloss.Style
+	ActiveBanner lipgloss.Style
+	Banner       lipgloss.Style
 }
 
 func NewStyles() (s Styles) {
@@ -66,6 +69,16 @@ func NewStyles() (s Styles) {
 		Foreground(lipgloss.AdaptiveColor{Light: "#F793FF", Dark: "#AD58B4"})
 	s.DisabledItemDescription = s.ItemDescription.Foreground(grayColor)
 
+	s.ActiveBanner = lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true).
+		BorderForeground(labelColor).
+		Foreground(labelColor)
+
+	s.Banner = lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true).
+		BorderForeground(whiteColor).
+		Foreground(whiteColor)
+
 	s.ActiveText = lipgloss.NewStyle().Foreground(whiteColor)
 	s.Text = lipgloss.NewStyle().Foreground(lightGrayColor)
 	s.Cursor = lipgloss.NewStyle().Foreground(whiteColor)
@@ -75,6 +88,7 @@ func NewStyles() (s Styles) {
 	s.SendButtonStyle = lipgloss.NewStyle().Background(darkGrayColor).Foreground(grayColor).Padding(0, 2)
 
 	s.Error = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F87"))
+	s.CommentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#757575")).PaddingLeft(1)
 
 	return s
 }

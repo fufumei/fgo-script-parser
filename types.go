@@ -7,10 +7,10 @@ const (
 	SourceSelect State = iota
 	AtlasTypeSelect
 	IdInput
-	// FileSelect
 	MiscOptions
 	ConfirmButton
 	Parsing
+	PickingFile
 )
 
 type Source int

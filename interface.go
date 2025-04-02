@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
@@ -28,7 +30,8 @@ type Model struct {
 	IdInput textarea.Model
 
 	// filepicker for local parsing.
-	// filepicker     filepicker.Model
+	filepicker  filepicker.Model
+	Attachments list.Model
 
 	// Print to file or not
 	NoFile bool
@@ -53,6 +56,21 @@ func NewModel() Model {
 	body.BlurredStyle.Text = styles.Text
 	body.Cursor.Style = styles.Cursor
 
+	attachments := list.New([]list.Item{}, attachmentDelegate{}, 0, 3)
+	attachments.DisableQuitKeybindings()
+	attachments.SetShowTitle(true)
+	attachments.Title = "Files"
+	attachments.Styles.Title = styles.CurrentLabel
+	attachments.Styles.TitleBar = styles.CurrentLabel
+	attachments.SetShowHelp(false)
+	attachments.SetShowStatusBar(false)
+	attachments.SetStatusBarItemName("script", "scripts")
+	attachments.SetShowPagination(false)
+
+	picker := filepicker.New()
+	picker.AllowedTypes = []string{".txt"}
+	picker.DirAllowed = true
+
 	loadingSpinner := spinner.New()
 	loadingSpinner.Style = styles.CurrentLabel
 	loadingSpinner.Spinner = spinner.Dot
@@ -62,16 +80,33 @@ func NewModel() Model {
 		styles: styles,
 		source: atlas,
 		sourceOptions: []ListItem{
-			{Title: "Atlas", Description: "Parse directly from Atlas IDs"},
-			{Title: "Local", Description: "Parse from local files on your computer\n(NOTE: Not implemented currently)"}},
+			{
+				Title:       "Atlas",
+				Description: "Parse directly from Atlas IDs",
+			},
+			{
+				Title:       "Local",
+				Description: "Parse from local files on your computer\n(NOTE: Not implemented currently)",
+			}},
 		atlasIdType: war,
 		atlasIdTypeOptions: []ListItem{
-			{Title: "War", Description: "Parse every script in a war (story chapter or event).\nEx: 100 for Fuyuki"},
-			{Title: "Quest", Description: "Parse every script in a quest (war section or interlude etc).\nEx: 1000001 for Fuyuki chapter 1"},
-			{Title: "Script", Description: "Parse specific scripts individually.\nEx: 0100000111 for Fuyuki chapter 1 post battle scene"},
+			{
+				Title:       "War",
+				Description: "Parse every script in a war (story chapter or event).\nEx: 100 for Fuyuki",
+			},
+			{
+				Title:       "Quest",
+				Description: "Parse every script in a quest (war section or interlude etc).\nEx: 1000001 for Fuyuki chapter 1",
+			},
+			{
+				Title:       "Script",
+				Description: "Parse specific scripts individually.\nEx: 0100000111 for Fuyuki chapter 1 post battle scene",
+			},
 		},
 		IdInput:        body,
 		NoFile:         false,
+		Attachments:    attachments,
+		filepicker:     picker,
 		loadingSpinner: loadingSpinner,
 		help:           help.New(),
 		keymap:         DefaultKeybinds(),
@@ -114,8 +149,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = IdInput
 				m.IdInput.Focus()
 				m.IdInput.CursorEnd()
+				// m.Attachments.SetDelegate(attachmentDelegate{true})
 			case IdInput:
 				m.IdInput.Blur()
+				// m.Attachments.SetDelegate(attachmentDelegate{false})
 				m.state = MiscOptions
 			case MiscOptions:
 				m.state = ConfirmButton
@@ -127,14 +164,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = SourceSelect
 			case IdInput:
 				m.IdInput.Blur()
+				m.Attachments.SetDelegate(attachmentDelegate{false})
 				m.state = AtlasTypeSelect
 			case MiscOptions:
 				m.state = IdInput
 				m.IdInput.Focus()
 				m.IdInput.CursorEnd()
+				m.Attachments.SetDelegate(attachmentDelegate{true})
 			case ConfirmButton:
 				m.state = MiscOptions
 			}
+
+		// case key.Matches(msg, m.keymap.Back):
+		// 	m.state = IdInput
+		// 	m.updateKeymap()
+		// 	return m, nil
+
+		// case key.Matches(msg, m.keymap.Attach):
+		// 	m.state = PickingFile
+		// 	return m, m.filepicker.Init()
+
+		// case key.Matches(msg, m.keymap.Unattach):
+		// 	m.Attachments.RemoveItem(m.Attachments.Index())
+		// 	m.Attachments.SetHeight(ordered.Max(len(m.Attachments.Items()), 1) + 2)
 
 		case key.Matches(msg, m.keymap.NextOption):
 			switch m.state {
@@ -189,20 +241,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 	m.IdInput, cmd = m.IdInput.Update(msg)
 	cmds = append(cmds, cmd)
-	// m.filepicker, cmd = m.filepicker.Update(msg)
-	// cmds = append(cmds, cmd)
+	m.filepicker, cmd = m.filepicker.Update(msg)
+	cmds = append(cmds, cmd)
 
 	switch m.state {
-	// case pickingFile:
+	// case PickingFile:
 	// 	if didSelect, path := m.filepicker.DidSelectFile(msg); didSelect {
 	// 		m.Attachments.InsertItem(0, attachment(path))
 	// 		m.Attachments.SetHeight(len(m.Attachments.Items()) + 2)
-	// 		m.state = editingAttachments
+	// 		m.state = IdInput
 	// 		m.updateKeymap()
 	// 	}
-	// case editingAttachments:
-	// 	m.Attachments, cmd = m.Attachments.Update(msg)
-	// 	cmds = append(cmds, cmd)
+	// case IdInput:
+	// 	if m.source == local {
+	// 		m.Attachments, cmd = m.Attachments.Update(msg)
+	// 		cmds = append(cmds, cmd)
+	// 	}
 	case Parsing:
 		m.loadingSpinner, cmd = m.loadingSpinner.Update(msg)
 		cmds = append(cmds, cmd)
@@ -210,6 +264,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.help, cmd = m.help.Update(msg)
 	cmds = append(cmds, cmd)
+	cmds = append(cmds, tea.ClearScrollArea)
 
 	return m, tea.Batch(cmds...)
 }
@@ -218,6 +273,13 @@ func (m Model) View() string {
 	if m.quitting {
 		return ""
 	}
+
+	// switch m.state {
+	// case PickingFile:
+	// 	return "\n" + m.styles.CurrentLabel.Render("Attachments") + " " +
+	// 		m.styles.CommentStyle.Render(m.filepicker.CurrentDirectory) +
+	// 		"\n\n" + m.filepicker.View()
+	// }
 
 	var (
 		sourceHeader string
@@ -350,11 +412,16 @@ func (m Model) View() string {
 		idInputHeader = m.styles.CurrentLabel.Render(currentHeader + idInputHeaderText)
 	}
 
+	idInput := m.IdInput.View()
+	// if m.source == local {
+	// 	idInput = m.Attachments.View()
+	// }
+
 	idInputRender =
 		lipgloss.JoinVertical(
 			lipgloss.Left,
 			idInputHeader,
-			m.IdInput.View(),
+			idInput,
 		)
 
 	noFileCheckbox := uncheckedBox
@@ -408,13 +475,61 @@ func (m Model) View() string {
 
 	parsingRender := confirmButtonRender
 	if m.state == Parsing {
-		parsingRender = m.loadingSpinner.View() + "Parsing script"
+		parsingRender = m.loadingSpinner.View() + "Parsing scripts"
 	}
 
 	errRender := ""
 	if m.err != nil {
 		errRender = m.styles.Error.Render(m.err.Error() + "\n")
 	}
+
+	// switch m.state {
+	// case SourceSelect:
+	// 	return m.styles.Padding.Render(lipgloss.JoinVertical(
+	// 		lipgloss.Left,
+	// 		sourceRender,
+	// 		m.help.View(m.keymap),
+	// 	))
+	// case AtlasTypeSelect:
+	// 	return m.styles.Padding.Render(lipgloss.JoinVertical(
+	// 		lipgloss.Left,
+	// 		atlasTypeRender,
+	// 		m.help.View(m.keymap),
+	// 	))
+	// case IdInput:
+	// 	if m.source == atlas {
+	// 		return m.styles.Padding.Render(lipgloss.JoinVertical(
+	// 			lipgloss.Left,
+	// 			lipgloss.JoinVertical(
+	// 				lipgloss.Left,
+	// 				m.IdInput.View(),
+	// 				idInput,
+	// 			),
+	// 			m.help.View(m.keymap),
+	// 		))
+
+	// 	} else {
+	// 		return m.styles.Padding.Render(lipgloss.JoinVertical(
+	// 			lipgloss.Left,
+	// 			lipgloss.JoinVertical(
+	// 				lipgloss.Left,
+	// 				m.Attachments.View(),
+	// 				idInput,
+	// 			),
+	// 			m.help.View(m.keymap),
+	// 		))
+	// 	}
+	// case ConfirmButton:
+	// case MiscOptions:
+	// 	return m.styles.Padding.Render(lipgloss.JoinVertical(
+	// 		lipgloss.Left,
+	// 		miscOptionsRender,
+	// 		"\n",
+	// 		parsingRender,
+	// 		errRender,
+	// 		m.help.View(m.keymap),
+	// 	))
+	// }
 
 	return m.styles.Padding.Render(lipgloss.JoinVertical(
 		lipgloss.Left,
@@ -424,7 +539,6 @@ func (m Model) View() string {
 		"\n",
 		miscOptionsRender,
 		"\n",
-		// confirmButtonRender,
 		parsingRender,
 		errRender,
 		m.help.View(m.keymap),

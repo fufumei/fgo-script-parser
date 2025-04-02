@@ -1,13 +1,15 @@
 module fgo-script-parser
 
-go 1.20
+go 1.24
 
-require golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
+require (
+	github.com/charmbracelet/bubbletea v1.1.0
+	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
+)
 
 require (
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/charmbracelet/bubbletea v1.1.0 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
 	github.com/charmbracelet/x/ansi v0.8.0 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
@@ -30,11 +32,11 @@ require (
 )
 
 require (
-	github.com/alecthomas/kong v1.6.1 // indirect
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/charmbracelet/x/exp/ordered v0.1.0
 	github.com/go-zoox/core-utils v1.2.11 // indirect
-	github.com/go-zoox/fetch v1.8.3 // indirect
+	github.com/go-zoox/fetch v1.8.3
 	github.com/go-zoox/headers v1.0.6 // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
 	github.com/tidwall/match v1.1.1 // indirect

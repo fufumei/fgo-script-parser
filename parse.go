@@ -29,14 +29,14 @@ type parseFailureMsg error
 func (m Model) parseScriptCmd() tea.Cmd {
 	return func() tea.Msg {
 		var results []ParseResult
+		if strings.TrimSpace(m.IdInput.Value()) == "" {
+			return parseFailureMsg(errors.New("IDs cannot be empty"))
+		}
 
 		if m.source == atlas {
-			if strings.TrimSpace(m.IdInput.Value()) == "" {
-				return parseFailureMsg(errors.New("IDs cannot be empty"))
-			}
 			results = m.ParseFromAtlas()
 		} else {
-			// results = ParseFromLocal()
+			results = m.ParseFromLocal()
 		}
 
 		var writer *csv.Writer
@@ -98,6 +98,36 @@ func (m Model) ParseFromAtlas() []ParseResult {
 		} else if m.atlasIdType == script {
 			result := FetchSingleScript(id)
 			results = append(results, result)
+		}
+	}
+
+	return results
+}
+
+func (m Model) ParseFromLocal() []ParseResult {
+	var results []ParseResult
+
+	for _, path := range strings.Split(m.IdInput.Value(), "\n\r") {
+		path = strings.Trim(path, "\"")
+		argInfo, err := os.Stat(path)
+		if err != nil {
+			log.Fatalf("Could not get file info for %s. %s", path, err)
+		}
+
+		// If given path is a file, just open and count it, else traverse the directory
+		if argInfo.IsDir() {
+			TraverseDirectories(path, &results)
+		} else {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				// TODO: Return failure message instead
+				log.Fatalf("Can't read file: %s", path)
+			}
+			count := CleanAndCountScript(string(data))
+			results = append(results, ParseResult{
+				name:  strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
+				count: count,
+			})
 		}
 	}
 
@@ -207,8 +237,9 @@ func FetchSingleScript(id string) ParseResult {
 	}
 }
 
-func TraverseDirectories(path string, writer *csv.Writer) {
+func TraverseDirectories(path string, results *[]ParseResult) {
 	entries, err := os.ReadDir(path)
+	// TODO: Return failure message
 	if err != nil {
 		fmt.Println("Unable to get entries for directory ", path)
 	}
@@ -220,7 +251,7 @@ func TraverseDirectories(path string, writer *csv.Writer) {
 	// If directories exist, call this recursively for each one until we hit the lowest level
 	if hasDirectory {
 		for _, e := range entries {
-			TraverseDirectories(filepath.Join(path, e.Name()), writer)
+			TraverseDirectories(filepath.Join(path, e.Name()), results)
 		}
 		return
 	}
@@ -231,13 +262,21 @@ func TraverseDirectories(path string, writer *csv.Writer) {
 	for _, e := range entries {
 		data, err := os.ReadFile(filepath.Join(path, e.Name()))
 		if err != nil {
+			// TODO: Return failure message
 			log.Fatalf("Can't read file: %s", filepath.Join(path, e.Name()))
 		}
 		count := CleanAndCountScript(string(data))
 		lines += count.lines
 		characters += count.characters
 	}
-	writer.Write([]string{filepath.Base(path), fmt.Sprint(lines), fmt.Sprint(characters)})
+	*results = append(*results, ParseResult{
+		name: filepath.Base(path),
+		count: Count{
+			lines:      lines,
+			characters: characters,
+		},
+	})
+	// writer.Write([]string{filepath.Base(path), fmt.Sprint(lines), fmt.Sprint(characters)})
 }
 
 func CleanAndCountScript(data string) Count {
