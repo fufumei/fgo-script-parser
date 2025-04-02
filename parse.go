@@ -107,7 +107,7 @@ func (m Model) ParseFromAtlas() []ParseResult {
 func (m Model) ParseFromLocal() []ParseResult {
 	var results []ParseResult
 
-	for _, path := range strings.Split(m.IdInput.Value(), "\n\r") {
+	for _, path := range strings.Split(m.IdInput.Value(), "\n") {
 		path = strings.Trim(path, "\"")
 		argInfo, err := os.Stat(path)
 		if err != nil {
@@ -276,7 +276,6 @@ func TraverseDirectories(path string, results *[]ParseResult) {
 			characters: characters,
 		},
 	})
-	// writer.Write([]string{filepath.Base(path), fmt.Sprint(lines), fmt.Sprint(characters)})
 }
 
 func CleanAndCountScript(data string) Count {

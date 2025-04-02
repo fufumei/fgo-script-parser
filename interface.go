@@ -33,6 +33,7 @@ type Model struct {
 	filepicker  filepicker.Model
 	Attachments list.Model
 
+	// TODO: Change to an "options" struct
 	// Print to file or not
 	NoFile bool
 
@@ -362,6 +363,7 @@ func (m Model) View() string {
 		atlasTypeHeader = m.styles.CurrentLabel.Render(currentHeader + atlasTypeHeaderText)
 	}
 
+	// TODO: Hide when parsing from local
 	for i, o := range m.atlasIdTypeOptions {
 		title := o.Title
 		desc := o.Description
@@ -403,6 +405,8 @@ func (m Model) View() string {
 				)),
 		)
 
+	// TODO: Include description to explain one ID per line,
+	// and for local it takes one FULL filepath per line
 	switch {
 	case idInputState < 0:
 		idInputHeader = m.styles.PreviousLabel.Render(idInputHeaderText)
