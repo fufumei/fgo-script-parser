@@ -100,7 +100,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case parseFailureMsg:
 		m.err = msg
+		m.state = ConfirmButton
 		return m, clearErrAfter(10 * time.Second)
+	case clearErrMsg:
+		m.err = nil
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.NextInput):
@@ -166,6 +169,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, m.keymap.Confirm):
 			m.state = Parsing
+			m.err = nil
 			return m, tea.Batch(
 				m.loadingSpinner.Tick,
 				m.parseScriptCmd(),
@@ -402,9 +406,14 @@ func (m Model) View() string {
 		confirmButtonRender = m.styles.SendButtonActiveStyle.Render(confirmButtonText)
 	}
 
-	parsingRender := ""
+	parsingRender := confirmButtonRender
 	if m.state == Parsing {
 		parsingRender = m.loadingSpinner.View() + "Parsing script"
+	}
+
+	errRender := ""
+	if m.err != nil {
+		errRender = m.styles.Error.Render(m.err.Error() + "\n")
 	}
 
 	return m.styles.Padding.Render(lipgloss.JoinVertical(
@@ -415,10 +424,9 @@ func (m Model) View() string {
 		"\n",
 		miscOptionsRender,
 		"\n",
-		confirmButtonRender,
+		// confirmButtonRender,
 		parsingRender,
+		errRender,
 		m.help.View(m.keymap),
-		"\n",
-		m.styles.Error.Render(m.err.Error()),
 	))
 }

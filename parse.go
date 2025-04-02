@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -30,6 +31,9 @@ func (m Model) parseScriptCmd() tea.Cmd {
 		var results []ParseResult
 
 		if m.source == atlas {
+			if strings.TrimSpace(m.IdInput.Value()) == "" {
+				return parseFailureMsg(errors.New("IDs cannot be empty"))
+			}
 			results = m.ParseFromAtlas()
 		} else {
 			// results = ParseFromLocal()
