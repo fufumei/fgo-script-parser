@@ -70,12 +70,12 @@ func NewStyles() (s Styles) {
 	s.DisabledItemDescription = s.ItemDescription.Foreground(grayColor)
 
 	s.ActiveBanner = lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true).
+		Border(lipgloss.NormalBorder(), false, true).
 		BorderForeground(labelColor).
 		Foreground(labelColor)
 
 	s.Banner = lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true).
+		Border(lipgloss.NormalBorder(), false, true).
 		BorderForeground(whiteColor).
 		Foreground(whiteColor)
 

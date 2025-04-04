@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/charmbracelet/bubbles/filepicker"
@@ -87,7 +88,7 @@ func NewModel() Model {
 			},
 			{
 				Title:       "Local",
-				Description: "Parse from local files on your computer\n(NOTE: Not implemented currently)",
+				Description: "Parse from local files on your computer",
 			}},
 		atlasIdType: war,
 		atlasIdTypeOptions: []ListItem{
@@ -142,10 +143,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = nil
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, m.keymap.NextInput):
+		case key.Matches(msg, m.keymap.NextState):
 			switch m.state {
 			case SourceSelect:
-				m.state = AtlasTypeSelect
+				if m.source == atlas {
+					m.state = AtlasTypeSelect
+				} else {
+					m.state = IdInput
+				}
 			case AtlasTypeSelect:
 				m.state = IdInput
 				m.IdInput.Focus()
@@ -159,14 +164,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = ConfirmButton
 			}
 
-		case key.Matches(msg, m.keymap.PrevInput):
+		case key.Matches(msg, m.keymap.PrevState):
 			switch m.state {
 			case AtlasTypeSelect:
 				m.state = SourceSelect
 			case IdInput:
+				if m.source == atlas {
+					m.state = AtlasTypeSelect
+				} else {
+					m.state = SourceSelect
+				}
 				m.IdInput.Blur()
 				m.Attachments.SetDelegate(attachmentDelegate{false})
-				m.state = AtlasTypeSelect
 			case MiscOptions:
 				m.state = IdInput
 				m.IdInput.Focus()
@@ -291,9 +300,6 @@ func (m Model) View() string {
 		atlasTypeList   []string
 		atlasTypeRender string
 
-		idInputHeader string
-		idInputRender string
-
 		miscOptionsHeader string
 		miscOptionsList   []string
 		miscOptionsRender string
@@ -307,17 +313,17 @@ func (m Model) View() string {
 	checkedBox := "[X] "
 	sourceHeaderText := "Source "
 	atlasTypeHeaderText := "Source Type "
-	idInputHeaderText := "IDs "
+	// idInputHeaderText := "IDs "
 	miscOptionsHeaderText := "Options "
 	noFileHeaderText := "No file:"
-	noFileHeaderDescText := "If checked, print the result directly to the terminal,\notherwise outputs to a csv on the same level as the script.\n(NOTE: This option does nothing currently.)"
+	noFileHeaderDescText := "If checked, print the result directly to the terminal,\notherwise outputs to a csv on the same level as the script."
 	confirmButtonText := "Parse"
 
 	// 	 0: current state
 	// < 0: previous state
 	// > 0: upcoming state
 	atlasTypeState := int(AtlasTypeSelect) - int(m.state)
-	idInputState := int(IdInput) - int(m.state)
+	// idInputState := int(IdInput) - int(m.state)
 	miscOptionsState := int(MiscOptions) - int(m.state)
 	confirmButtonState := int(ConfirmButton) - int(m.state)
 
@@ -363,7 +369,6 @@ func (m Model) View() string {
 		atlasTypeHeader = m.styles.CurrentLabel.Render(currentHeader + atlasTypeHeaderText)
 	}
 
-	// TODO: Hide when parsing from local
 	for i, o := range m.atlasIdTypeOptions {
 		title := o.Title
 		desc := o.Description
@@ -407,26 +412,16 @@ func (m Model) View() string {
 
 	// TODO: Include description to explain one ID per line,
 	// and for local it takes one FULL filepath per line
-	switch {
-	case idInputState < 0:
-		idInputHeader = m.styles.PreviousLabel.Render(idInputHeaderText)
-	case idInputState > 0:
-		idInputHeader = m.styles.Disabled.Render(idInputHeaderText)
-	case idInputState == 0:
-		idInputHeader = m.styles.CurrentLabel.Render(currentHeader + idInputHeaderText)
-	}
-
-	idInput := m.IdInput.View()
-	// if m.source == local {
-	// 	idInput = m.Attachments.View()
+	// switch {
+	// case idInputState < 0:
+	// 	idInputHeader = m.styles.PreviousLabel.Render(idInputHeaderText)
+	// case idInputState > 0:
+	// 	idInputHeader = m.styles.Disabled.Render(idInputHeaderText)
+	// case idInputState == 0:
+	// 	idInputHeader = m.styles.CurrentLabel.Render(currentHeader + idInputHeaderText)
 	// }
 
-	idInputRender =
-		lipgloss.JoinVertical(
-			lipgloss.Left,
-			idInputHeader,
-			idInput,
-		)
+	idInput := m.IdInput.View()
 
 	noFileCheckbox := uncheckedBox
 	if m.NoFile {
@@ -487,64 +482,76 @@ func (m Model) View() string {
 		errRender = m.styles.Error.Render(m.err.Error() + "\n")
 	}
 
-	// switch m.state {
-	// case SourceSelect:
-	// 	return m.styles.Padding.Render(lipgloss.JoinVertical(
-	// 		lipgloss.Left,
-	// 		sourceRender,
-	// 		m.help.View(m.keymap),
-	// 	))
-	// case AtlasTypeSelect:
-	// 	return m.styles.Padding.Render(lipgloss.JoinVertical(
-	// 		lipgloss.Left,
-	// 		atlasTypeRender,
-	// 		m.help.View(m.keymap),
-	// 	))
-	// case IdInput:
-	// 	if m.source == atlas {
-	// 		return m.styles.Padding.Render(lipgloss.JoinVertical(
-	// 			lipgloss.Left,
-	// 			lipgloss.JoinVertical(
-	// 				lipgloss.Left,
-	// 				m.IdInput.View(),
-	// 				idInput,
-	// 			),
-	// 			m.help.View(m.keymap),
-	// 		))
+	// TODO: Check https://github.com/jahvon/flow
+	var states []string
+	validStates := []State{SourceSelect, AtlasTypeSelect, IdInput, MiscOptions}
+	if m.source == local {
+		validStates = slices.DeleteFunc(validStates, func(s State) bool {
+			return s == AtlasTypeSelect
+		})
+	}
+	for _, state := range []State{SourceSelect, AtlasTypeSelect, IdInput, MiscOptions} {
+		name := ""
+		switch state {
+		case SourceSelect:
+			name = "Source"
+		case AtlasTypeSelect:
+			name = "Type"
+		case IdInput:
+			name = "IDs"
+		case MiscOptions:
+			name = "Options"
+		}
+		if m.state == state {
+			states = append(states, m.styles.ActiveBanner.Render(name))
+		} else {
+			states = append(states, m.styles.Banner.Render(name))
+		}
+		// if state != MiscOptions {
+		// 	states = append(states, "->")
+		// }
+	}
+	stateFlow := lipgloss.JoinHorizontal(
+		lipgloss.Center,
+		states...,
+	)
 
-	// 	} else {
-	// 		return m.styles.Padding.Render(lipgloss.JoinVertical(
-	// 			lipgloss.Left,
-	// 			lipgloss.JoinVertical(
-	// 				lipgloss.Left,
-	// 				m.Attachments.View(),
-	// 				idInput,
-	// 			),
-	// 			m.help.View(m.keymap),
-	// 		))
-	// 	}
-	// case ConfirmButton:
-	// case MiscOptions:
-	// 	return m.styles.Padding.Render(lipgloss.JoinVertical(
-	// 		lipgloss.Left,
-	// 		miscOptionsRender,
-	// 		"\n",
-	// 		parsingRender,
-	// 		errRender,
-	// 		m.help.View(m.keymap),
-	// 	))
-	// }
+	statePaneRender := ""
+	switch m.state {
+	case SourceSelect:
+		statePaneRender = (lipgloss.JoinVertical(
+			lipgloss.Left,
+			sourceRender,
+			m.help.View(m.keymap),
+		))
+	case AtlasTypeSelect:
+		statePaneRender = (lipgloss.JoinVertical(
+			lipgloss.Left,
+			atlasTypeRender,
+			m.help.View(m.keymap),
+		))
+	case IdInput:
+		statePaneRender = (lipgloss.JoinVertical(
+			lipgloss.Left,
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				m.IdInput.View(),
+				idInput,
+			),
+			// TODO: Display an error directly here if empty when pressing next state
+			m.help.View(m.keymap),
+		))
+	case MiscOptions, ConfirmButton:
+		statePaneRender = (lipgloss.JoinVertical(
+			lipgloss.Left,
+			miscOptionsRender,
+			"\n",
+			parsingRender,
+			errRender,
+			m.help.View(m.keymap),
+		))
+		// TODO: Result state
+	}
 
-	return m.styles.Padding.Render(lipgloss.JoinVertical(
-		lipgloss.Left,
-		sourceRender,
-		atlasTypeRender,
-		idInputRender,
-		"\n",
-		miscOptionsRender,
-		"\n",
-		parsingRender,
-		errRender,
-		m.help.View(m.keymap),
-	))
+	return m.styles.Padding.Render(lipgloss.JoinVertical(lipgloss.Left, stateFlow, "\n", statePaneRender))
 }

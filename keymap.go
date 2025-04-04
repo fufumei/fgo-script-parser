@@ -3,8 +3,8 @@ package main
 import "github.com/charmbracelet/bubbles/key"
 
 type KeyMap struct {
-	NextInput  key.Binding
-	PrevInput  key.Binding
+	NextState  key.Binding
+	PrevState  key.Binding
 	NextOption key.Binding
 	PrevOption key.Binding
 	Confirm    key.Binding
@@ -17,11 +17,11 @@ type KeyMap struct {
 
 func DefaultKeybinds() KeyMap {
 	return KeyMap{
-		NextInput: key.NewBinding(
+		NextState: key.NewBinding(
 			key.WithKeys("tab"),
 			key.WithHelp("tab", "next"),
 		),
-		PrevInput: key.NewBinding(
+		PrevState: key.NewBinding(
 			key.WithKeys("shift+tab"),
 			key.WithHelp("shift+tab", "prev"),
 		),
@@ -66,8 +66,8 @@ func DefaultKeybinds() KeyMap {
 // ShortHelp returns the key bindings for the short help screen.
 func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		k.NextInput,
-		k.PrevInput,
+		k.NextState,
+		k.PrevState,
 		k.Toggle,
 		k.Confirm,
 		k.Attach, k.Unattach,
@@ -78,13 +78,13 @@ func (k KeyMap) ShortHelp() []key.Binding {
 // FullHelp returns the key bindings for the full help screen.
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.NextInput, k.Confirm, k.Attach, k.Unattach, k.Quit},
+		{k.NextState, k.Confirm, k.Attach, k.Unattach, k.Quit},
 	}
 }
 
 func (m *Model) updateKeymap() {
-	m.keymap.NextInput.SetEnabled(m.state != ConfirmButton)
-	m.keymap.PrevInput.SetEnabled(m.state != SourceSelect)
+	m.keymap.NextState.SetEnabled(m.state != ConfirmButton)
+	m.keymap.PrevState.SetEnabled(m.state != SourceSelect)
 	m.keymap.NextOption.SetEnabled(m.state == SourceSelect || m.state == AtlasTypeSelect)
 	m.keymap.PrevOption.SetEnabled(m.state == SourceSelect || m.state == AtlasTypeSelect)
 	m.keymap.Confirm.SetEnabled(m.state == ConfirmButton)
