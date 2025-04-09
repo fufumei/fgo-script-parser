@@ -46,7 +46,7 @@ func GetDefaultTheme() Theme {
 		Gray:           "#75828a",
 		Black:          "#343F44",
 		Gold:           "#f4cf0b",
-		SpinnerType:    spinner.Points,
+		SpinnerType:    spinner.Line,
 	}
 	return theme
 }
@@ -89,6 +89,11 @@ func renderDescription(s string, theme Theme) string {
 
 func renderDefault(s string, theme Theme) string {
 	style := lipgloss.NewStyle().Foreground(theme.PrimaryColor)
+	return style.Render(s)
+}
+
+func renderError(s string, theme Theme) string {
+	style := lipgloss.NewStyle().Foreground(theme.ErrorColor)
 	return style.Render(s)
 }
 

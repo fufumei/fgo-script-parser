@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/stopwatch"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -81,6 +83,7 @@ const (
 	IdInput
 	MiscOptions
 	Confirm
+	Results
 	Parsing
 )
 
@@ -98,33 +101,34 @@ type Model struct {
 	help                   help.Model
 	keymap                 KeyMap
 	loadingSpinner         spinner.Model
+	timer                  stopwatch.Model
 
-	currentState                    State
-	currentOption, currentSubOption int
-	selectedSource                  Source
-	selectedAtlasIdType             AtlasIdType
-	options                         Options
-	quitting                        bool
-	abort                           bool
-	err                             error
+	// currentOption, currentSubOption int
+	currentState        State
+	selectedSource      Source
+	selectedAtlasIdType AtlasIdType
+	options             Options
+	results             []ParseResult
+	quitting            bool
+	abort               bool
+	err                 error
 }
 
 func NewModel() Model {
 	body := textarea.New()
-	body.ShowLineNumbers = false
-	// body.FocusedStyle.CursorLine = styles.ActiveText
-	// body.FocusedStyle.Prompt = styles.CurrentLabel
-	// body.FocusedStyle.Text = styles.ActiveText
-	// body.BlurredStyle.CursorLine = styles.Text
-	// body.BlurredStyle.Text = styles.Text
-	// body.Cursor.Style = styles.Cursor
+	body.ShowLineNumbers = true
+	body.Prompt = ""
+
+	loadingSpinner := spinner.New()
 
 	return Model{
-		theme:        GetDefaultTheme(),
-		IdInput:      body,
-		help:         help.New(),
-		keymap:       DefaultKeybinds(),
-		currentState: SourceSelect,
+		theme:          GetDefaultTheme(),
+		IdInput:        body,
+		loadingSpinner: loadingSpinner,
+		help:           help.New(),
+		keymap:         DefaultKeybinds(),
+		currentState:   SourceSelect,
+		timer:          stopwatch.NewWithInterval(time.Millisecond),
 	}
 }
 
@@ -143,7 +147,10 @@ func calculateViewportWidths(terminalWidth int) (int, int) {
 
 func (m Model) statePaneContent() string {
 	var sb strings.Builder
-	steps := []string{"Source", "Type", "IDs", "Options", "Confirm"}
+	steps := []string{"Source", "Type", "IDs", "Options", "Parse"}
+	if len(m.results) > 0 {
+		steps = append(steps, "Results")
+	}
 	sb.WriteString(renderPaneTitle("Steps", m.theme))
 	paneWidth, _ := calculateViewportWidths(m.terminalWidth)
 
@@ -174,8 +181,10 @@ func (m Model) optionsPaneContent() string {
 		return m.idInputContent()
 	case MiscOptions:
 		return m.miscOptionsContent()
-	case Confirm:
-		return ""
+	case Confirm, Parsing:
+		return m.parseContent()
+	case Results:
+		return m.resultsContent()
 	}
 
 	return "Something went wrong..."
@@ -234,7 +243,7 @@ func (m Model) miscOptionsContent() string {
 		prefix = renderSelected("☑  ", m.theme)
 	}
 	title := renderSelected("No file", m.theme)
-	desc := renderDescription("If checked, the result will print directly to the terminal,\notherwise outputs to a csv on the same level as the script.", m.theme)
+	desc := renderDescription("If checked, the result will only print to the terminal,\notherwise also outputs to a csv on the same level as the script.", m.theme)
 
 	sb.WriteString(
 		lipgloss.JoinVertical(
@@ -246,8 +255,48 @@ func (m Model) miscOptionsContent() string {
 	return sb.String()
 }
 
+func (m Model) parseContent() string {
+	var sb strings.Builder
+
+	if m.currentState == Confirm {
+		button := lipgloss.NewStyle().Background(m.theme.BorderColor).Foreground(m.theme.White).Padding(0, 2).Render("Parse")
+		sb.WriteString(button)
+	} else if m.currentState == Parsing {
+		sb.WriteString(
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				m.loadingSpinner.View()+" Parsing scripts...",
+				"Elapsed time: "+m.timer.View(),
+			),
+		)
+
+	}
+
+	return sb.String()
+}
+
+func (m Model) resultsContent() string {
+	var sb strings.Builder
+
+	for _, r := range m.results {
+		sb.WriteString(fmt.Sprintf("%s\t%s\t%s\n", r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)))
+	}
+
+	return sb.String()
+}
+
+// TODO: Prevent changing state while entering IDs, have to press esc to blur and enter to focus again?
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case parseSuccessMsg:
+		// TODO: Display results in a table (bubbles)
+		m.currentState = Results
+		m.results = msg
+		// return m, tea.Quit
+	case parseFailureMsg:
+		m.err = msg
+		m.currentState = Confirm
+		// return m, nil
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.NextState):
@@ -257,6 +306,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.currentState = AtlasTypeSelect
 				} else {
 					m.currentState = IdInput
+					m.IdInput.Focus()
+					m.IdInput.CursorEnd()
 				}
 			case AtlasTypeSelect:
 				m.currentState = IdInput
@@ -267,6 +318,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentState = MiscOptions
 			case MiscOptions:
 				m.currentState = Confirm
+			case Confirm:
+				if len(m.results) > 0 {
+					m.currentState = Results
+				}
 			}
 
 		case key.Matches(msg, m.keymap.PrevState):
@@ -286,6 +341,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.IdInput.CursorEnd()
 			case Confirm:
 				m.currentState = MiscOptions
+			case Results:
+				m.currentState = Confirm
 			}
 
 		case key.Matches(msg, m.keymap.NextOption):
@@ -324,7 +381,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = nil
 			return m, tea.Batch(
 				m.loadingSpinner.Tick,
-				// m.parseScriptCmd(),
+				m.timer.Start(),
+				m.parseScriptCmd(),
 			)
 
 		case key.Matches(msg, m.keymap.Quit):
@@ -359,6 +417,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.IdInput.SetHeight(msg.Height - verticalMarginHeight)
 			m.IdInput.SetWidth(w2)
+			m.IdInput.FocusedStyle.CursorLine = lipgloss.NewStyle().Foreground(m.theme.SecondaryColor)
+
+			m.loadingSpinner.Style = lipgloss.NewStyle().Foreground(m.theme.SecondaryColor)
+			m.loadingSpinner.Spinner = m.theme.SpinnerType
+
 			m.ready = true
 		} else {
 			m.statePane.Width = w1
@@ -382,6 +445,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loadingSpinner, cmd = m.loadingSpinner.Update(msg)
 		cmds = append(cmds, cmd)
 	}
+	m.timer, cmd = m.timer.Update(msg)
+	cmds = append(cmds, cmd)
 	m.help, cmd = m.help.Update(msg)
 	cmds = append(cmds, cmd)
 
@@ -396,6 +461,7 @@ func (m Model) View() string {
 	}
 
 	m.statePane.SetContent(m.statePaneContent())
+	// TODO: Add a header text to explain each step
 	m.optionsPane.SetContent(m.optionsPaneContent())
 
 	return lipgloss.JoinVertical(
@@ -425,6 +491,19 @@ func (m Model) footerView() string {
 		BorderForeground(m.theme.BorderColor).
 		Height(FooterHeight - 1). // top border
 		Width(m.terminalWidth)
+
+	errRender := ""
+	if m.err != nil {
+		errRender = renderError(m.err.Error(), m.theme)
+		return footerStyle.Render(
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				m.help.View(m.keymap),
+				errRender,
+			),
+		)
+	}
+
 	return footerStyle.Render(m.help.View(m.keymap))
 }
 
