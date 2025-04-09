@@ -54,7 +54,9 @@ func (m Model) parseScriptCmd() tea.Cmd {
 			writer.Write([]string{r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)})
 		}
 
-		writer.Flush()
+		if !m.options.noFile {
+			writer.Flush()
+		}
 		return parseSuccessMsg(results)
 	}
 }

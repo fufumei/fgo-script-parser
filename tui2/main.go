@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/stopwatch"
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -102,6 +103,7 @@ type Model struct {
 	keymap                 KeyMap
 	loadingSpinner         spinner.Model
 	timer                  stopwatch.Model
+	resultsTable           table.Model
 
 	// currentOption, currentSubOption int
 	currentState        State
@@ -276,23 +278,43 @@ func (m Model) parseContent() string {
 }
 
 func (m Model) resultsContent() string {
-	var sb strings.Builder
-
-	for _, r := range m.results {
-		sb.WriteString(fmt.Sprintf("%s\t%s\t%s\n", r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)))
-	}
-
-	return sb.String()
+	return m.resultsTable.View()
 }
 
 // TODO: Prevent changing state while entering IDs, have to press esc to blur and enter to focus again?
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case parseSuccessMsg:
-		// TODO: Display results in a table (bubbles)
-		m.currentState = Results
+		// TODO: Add hotkeys to copy single or all values
 		m.results = msg
-		// return m, tea.Quit
+
+		// TODO: Calculate heights based on available width
+		columns := []table.Column{
+			{Title: "Name", Width: 25},
+			{Title: "Lines", Width: 25},
+			{Title: "Characters", Width: 25},
+		}
+
+		var rows []table.Row
+		for _, r := range msg {
+			rows = append(rows, table.Row{r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)})
+		}
+
+		headerHeight := lipgloss.Height(m.headerView())
+		footerHeight := lipgloss.Height(m.footerView())
+		verticalMarginHeight := headerHeight + footerHeight
+
+		t := table.New(
+			table.WithColumns(columns),
+			table.WithRows(rows),
+			table.WithFocused(true),
+			table.WithHeight(m.terminalHeight-verticalMarginHeight),
+		)
+		m.resultsTable = t
+		// TODO: Add table styling
+
+		m.currentState = Results
+		m.resultsTable.Focus()
 	case parseFailureMsg:
 		m.err = msg
 		m.currentState = Confirm
@@ -319,9 +341,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case MiscOptions:
 				m.currentState = Confirm
 			case Confirm:
-				if len(m.results) > 0 {
-					m.currentState = Results
-				}
+				// TODO: Doesn't work
+				// if len(m.results) > 0 {
+				m.currentState = Results
+				// }
 			}
 
 		case key.Matches(msg, m.keymap.PrevState):
@@ -381,6 +404,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = nil
 			return m, tea.Batch(
 				m.loadingSpinner.Tick,
+				m.timer.Reset(),
 				m.timer.Start(),
 				m.parseScriptCmd(),
 			)
@@ -446,6 +470,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 	m.timer, cmd = m.timer.Update(msg)
+	cmds = append(cmds, cmd)
+	m.resultsTable, cmd = m.resultsTable.Update(msg)
 	cmds = append(cmds, cmd)
 	m.help, cmd = m.help.Update(msg)
 	cmds = append(cmds, cmd)
