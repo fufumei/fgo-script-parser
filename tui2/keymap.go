@@ -11,10 +11,7 @@ type KeyMap struct {
 	PrevSubOption key.Binding
 	Confirm       key.Binding
 	Toggle        key.Binding
-	// Attach        key.Binding
-	// Unattach      key.Binding
-	// Back          key.Binding
-	Quit key.Binding
+	Quit          key.Binding
 }
 
 func DefaultKeybinds() KeyMap {
@@ -49,21 +46,6 @@ func DefaultKeybinds() KeyMap {
 			key.WithHelp("enter", "confirm"),
 			key.WithDisabled(),
 		),
-		// Attach: key.NewBinding(
-		// 	key.WithKeys("enter"),
-		// 	key.WithHelp("enter", "attach file"),
-		// 	key.WithDisabled(),
-		// ),
-		// Unattach: key.NewBinding(
-		// 	key.WithKeys("x"),
-		// 	key.WithHelp("x", "remove"),
-		// 	key.WithDisabled(),
-		// ),
-		// Back: key.NewBinding(
-		// 	key.WithKeys("esc"),
-		// 	key.WithHelp("esc", "back"),
-		// 	key.WithDisabled(),
-		// ),
 		Quit: key.NewBinding(
 			key.WithKeys("ctrl+q"),
 			key.WithHelp("ctrl+q", "quit"),
@@ -78,7 +60,6 @@ func (k KeyMap) ShortHelp() []key.Binding {
 		k.PrevState,
 		k.Toggle,
 		k.Confirm,
-		// k.Attach, k.Unattach,
 		k.Quit,
 	}
 }
@@ -89,31 +70,18 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{
 			k.NextState,
 			k.Confirm,
-			// k.Attach,
-			// k.Unattach,
 			k.Quit,
 		},
 	}
 }
 
-// func (m *Model) updateKeymap() {
-// 	m.keymap.NextState.SetEnabled(m.state != ConfirmButton)
-// 	m.keymap.PrevState.SetEnabled(m.state != SourceSelect)
-// 	m.keymap.NextOption.SetEnabled(m.state == SourceSelect || m.state == AtlasTypeSelect)
-// 	m.keymap.PrevOption.SetEnabled(m.state == SourceSelect || m.state == AtlasTypeSelect)
-// 	m.keymap.Confirm.SetEnabled(m.state == ConfirmButton)
-// 	m.keymap.Toggle.SetEnabled(m.state == MiscOptions)
-// 	m.keymap.Back.SetEnabled(m.state == PickingFile)
-// 	m.keymap.Attach.SetEnabled(m.state == IdInput && m.source == local)
-// 	m.keymap.Unattach.SetEnabled(m.state == IdInput && m.source == local && len(m.Attachments.Items()) > 0)
+func (m *Model) updateKeymap() {
+	stateHasOptions := m.currentState == SourceSelect || m.currentState == AtlasTypeSelect
 
-// 	m.filepicker.KeyMap.Up.SetEnabled(m.state == PickingFile && m.source == local)
-// 	m.filepicker.KeyMap.Down.SetEnabled(m.state == PickingFile && m.source == local)
-// 	m.filepicker.KeyMap.Back.SetEnabled(m.state == PickingFile && m.source == local)
-// 	m.filepicker.KeyMap.Select.SetEnabled(m.state == PickingFile && m.source == local)
-// 	m.filepicker.KeyMap.Open.SetEnabled(m.state == PickingFile && m.source == local)
-// 	m.filepicker.KeyMap.PageUp.SetEnabled(m.state == PickingFile && m.source == local)
-// 	m.filepicker.KeyMap.PageDown.SetEnabled(m.state == PickingFile && m.source == local)
-// 	m.filepicker.KeyMap.GoToTop.SetEnabled(m.state == PickingFile && m.source == local)
-// 	m.filepicker.KeyMap.GoToLast.SetEnabled(m.state == PickingFile && m.source == local)
-// }
+	m.keymap.NextState.SetEnabled(m.currentState != Confirm)
+	m.keymap.PrevState.SetEnabled(m.currentState != SourceSelect)
+	m.keymap.NextOption.SetEnabled(stateHasOptions)
+	m.keymap.PrevOption.SetEnabled(stateHasOptions)
+	m.keymap.Toggle.SetEnabled(m.currentState == MiscOptions)
+	m.keymap.Confirm.SetEnabled(m.currentState == Confirm)
+}

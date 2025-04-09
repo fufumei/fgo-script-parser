@@ -27,23 +27,25 @@ type Theme struct {
 	White          lipgloss.Color
 	Gray           lipgloss.Color
 	Black          lipgloss.Color
+	Gold           lipgloss.Color
 }
 
-func GetTheme() Theme {
+func GetDefaultTheme() Theme {
 	theme := Theme{
 		BodyColor:      "#D3C6AA",
 		EmphasisColor:  "#E67E80",
-		BorderColor:    "#5C6A72",
-		PrimaryColor:   "#7FBBB3",
-		SecondaryColor: "#83C092",
-		TertiaryColor:  "#D699B6",
+		BorderColor:    "#2C5CA4",
+		PrimaryColor:   "#D1E3FA",
+		SecondaryColor: "#0f81cf",
+		TertiaryColor:  "#9EDEFF",
 		SuccessColor:   "#8DA101",
 		WarningColor:   "#5C6A72",
 		InfoColor:      "#3A94C5",
 		ErrorColor:     "#F85552",
 		White:          "#DFDDC8",
-		Gray:           "#5C6A72",
+		Gray:           "#75828a",
 		Black:          "#343F44",
+		Gold:           "#f4cf0b",
 		SpinnerType:    spinner.Points,
 	}
 	return theme
@@ -54,25 +56,39 @@ func paneStyle(pos int, theme Theme) lipgloss.Style {
 		return lipgloss.NewStyle().Padding(0, 1).BorderStyle(lipgloss.NormalBorder()).
 			BorderForeground(theme.BorderColor).BorderRight(true)
 	} else {
-		return lipgloss.NewStyle().Padding(0, 0, 0, 3)
+		return lipgloss.NewStyle().Padding(2, 0, 0, 3)
 	}
 }
 
-func renderPaneTitle(s string, theme Theme) string {
-	var title string
-	title = s
-
-	style := lipgloss.NewStyle().Foreground(theme.SecondaryColor).Padding(0, 1).Bold(true)
-	return style.Render(title) + "\n\n"
-}
-
-func renderSelection(s string, theme Theme) string {
-	style := lipgloss.NewStyle().Foreground(theme.PrimaryColor)
+func headerStyle(s string, theme Theme) string {
+	b := lipgloss.RoundedBorder()
+	b.Right = "├"
+	style := lipgloss.NewStyle().BorderStyle(b).BorderForeground(theme.BorderColor).Foreground(theme.Gold).Padding(0, 1)
 	return style.Render(s)
 }
 
-func renderInactive(s string, theme Theme) string {
+func renderPaneTitle(s string, theme Theme) string {
+	style := lipgloss.NewStyle().Foreground(theme.TertiaryColor).Padding(0, 1).Bold(true)
+	return style.Render(s) + "\n\n"
+}
+
+func renderInactiveState(s string, theme Theme) string {
 	style := lipgloss.NewStyle().Foreground(theme.Gray)
+	return style.Render(s)
+}
+
+func renderSelected(s string, theme Theme) string {
+	style := lipgloss.NewStyle().Foreground(theme.SecondaryColor)
+	return style.Render(s)
+}
+
+func renderDescription(s string, theme Theme) string {
+	style := lipgloss.NewStyle().PaddingLeft(2).Foreground(theme.Gray)
+	return style.Render(s)
+}
+
+func renderDefault(s string, theme Theme) string {
+	style := lipgloss.NewStyle().Foreground(theme.PrimaryColor)
 	return style.Render(s)
 }
 

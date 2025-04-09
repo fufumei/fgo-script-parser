@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -92,12 +94,15 @@ type Model struct {
 
 	theme                  Theme
 	statePane, optionsPane viewport.Model
+	IdInput                textarea.Model
 	help                   help.Model
 	keymap                 KeyMap
 	loadingSpinner         spinner.Model
 
 	currentState                    State
 	currentOption, currentSubOption int
+	selectedSource                  Source
+	selectedAtlasIdType             AtlasIdType
 	options                         Options
 	quitting                        bool
 	abort                           bool
@@ -105,10 +110,21 @@ type Model struct {
 }
 
 func NewModel() Model {
+	body := textarea.New()
+	body.ShowLineNumbers = false
+	// body.FocusedStyle.CursorLine = styles.ActiveText
+	// body.FocusedStyle.Prompt = styles.CurrentLabel
+	// body.FocusedStyle.Text = styles.ActiveText
+	// body.BlurredStyle.CursorLine = styles.Text
+	// body.BlurredStyle.Text = styles.Text
+	// body.Cursor.Style = styles.Cursor
+
 	return Model{
-		theme:  GetTheme(),
-		help:   help.New(),
-		keymap: DefaultKeybinds(),
+		theme:        GetDefaultTheme(),
+		IdInput:      body,
+		help:         help.New(),
+		keymap:       DefaultKeybinds(),
+		currentState: SourceSelect,
 	}
 }
 
@@ -128,7 +144,7 @@ func calculateViewportWidths(terminalWidth int) (int, int) {
 func (m Model) statePaneContent() string {
 	var sb strings.Builder
 	steps := []string{"Source", "Type", "IDs", "Options", "Confirm"}
-	sb.WriteString(renderPaneTitle("Step", m.theme))
+	sb.WriteString(renderPaneTitle("Steps", m.theme))
 	paneWidth, _ := calculateViewportWidths(m.terminalWidth)
 
 	for i, step := range steps {
@@ -138,60 +154,183 @@ func (m Model) statePaneContent() string {
 		}
 
 		if State(i) == m.currentState {
-			sb.WriteString(renderSelection(prefix+truncateText(step, paneWidth), m.theme))
-			sb.WriteString("\n")
+			sb.WriteString(renderSelected(prefix+truncateText(step, paneWidth), m.theme))
 		} else {
-			sb.WriteString(renderInactive(prefix+truncateText(step, paneWidth), m.theme))
-			sb.WriteString("\n")
+			sb.WriteString(renderInactiveState(prefix+truncateText(step, paneWidth), m.theme))
 		}
+		sb.WriteString("\n")
 	}
 
 	return sb.String()
 }
 
 func (m Model) optionsPaneContent() string {
-	var sb strings.Builder
-	steps := []string{"a", "ab", "IDs", "Options", "Confirm"}
-	sb.WriteString(renderPaneTitle("", m.theme))
-	_, paneWidth := calculateViewportWidths(m.terminalWidth)
+	switch m.currentState {
+	case SourceSelect:
+		return m.sourceSelectContent()
+	case AtlasTypeSelect:
+		return m.atlasIdTypeSelectContent()
+	case IdInput:
+		return m.idInputContent()
+	case MiscOptions:
+		return m.miscOptionsContent()
+	case Confirm:
+		return ""
+	}
 
-	for i, step := range steps {
+	return "Something went wrong..."
+}
+
+func (m Model) sourceSelectContent() string {
+	var sb strings.Builder
+
+	for _, o := range sourceOptions {
 		prefix := "◌ "
-		if State(i) == m.currentState {
+		if m.selectedSource == o.value {
 			prefix = "◉ "
 		}
 
-		if State(i) == m.currentState {
-			sb.WriteString(renderSelection(prefix+truncateText(step, paneWidth), m.theme))
-			sb.WriteString("\n")
+		if m.selectedSource == o.value {
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", renderSelected(o.Title, m.theme), renderDescription(o.Description, m.theme)))
 		} else {
-			sb.WriteString(renderInactive(prefix+truncateText(step, paneWidth), m.theme))
-			sb.WriteString("\n")
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", renderDefault(o.Title, m.theme), renderDescription(o.Description, m.theme)))
 		}
+		sb.WriteString("\n")
 	}
 
 	return sb.String()
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var (
-		cmd  tea.Cmd
-		cmds []tea.Cmd
-	)
+func (m Model) atlasIdTypeSelectContent() string {
+	var sb strings.Builder
 
+	for _, o := range atlasIdTypeOptions {
+		prefix := "◌ "
+		if m.selectedAtlasIdType == o.value {
+			prefix = "◉ "
+		}
+
+		if m.selectedAtlasIdType == o.value {
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", renderSelected(o.Title, m.theme), renderDescription(o.Description, m.theme)))
+		} else {
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", renderDefault(o.Title, m.theme), renderDescription(o.Description, m.theme)))
+		}
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
+}
+
+func (m Model) idInputContent() string {
+	return m.IdInput.View()
+}
+
+// TODO: Clean this up like the above
+func (m Model) miscOptionsContent() string {
+	var sb strings.Builder
+
+	prefix := "☐ "
+	if m.options.noFile {
+		prefix = renderSelected("☑  ", m.theme)
+	}
+	title := renderSelected("No file", m.theme)
+	desc := renderDescription("If checked, the result will print directly to the terminal,\notherwise outputs to a csv on the same level as the script.", m.theme)
+
+	sb.WriteString(
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			prefix+title,
+			desc,
+		))
+
+	return sb.String()
+}
+
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "ctrl+q":
+		switch {
+		case key.Matches(msg, m.keymap.NextState):
+			switch m.currentState {
+			case SourceSelect:
+				if m.selectedSource == atlas {
+					m.currentState = AtlasTypeSelect
+				} else {
+					m.currentState = IdInput
+				}
+			case AtlasTypeSelect:
+				m.currentState = IdInput
+				m.IdInput.Focus()
+				m.IdInput.CursorEnd()
+			case IdInput:
+				m.IdInput.Blur()
+				m.currentState = MiscOptions
+			case MiscOptions:
+				m.currentState = Confirm
+			}
+
+		case key.Matches(msg, m.keymap.PrevState):
+			switch m.currentState {
+			case AtlasTypeSelect:
+				m.currentState = SourceSelect
+			case IdInput:
+				if m.selectedSource == atlas {
+					m.currentState = AtlasTypeSelect
+				} else {
+					m.currentState = SourceSelect
+				}
+				m.IdInput.Blur()
+			case MiscOptions:
+				m.currentState = IdInput
+				m.IdInput.Focus()
+				m.IdInput.CursorEnd()
+			case Confirm:
+				m.currentState = MiscOptions
+			}
+
+		case key.Matches(msg, m.keymap.NextOption):
+			switch m.currentState {
+			case SourceSelect:
+				if m.selectedSource == atlas {
+					m.selectedSource = local
+				} else {
+					m.selectedSource = atlas
+				}
+			case AtlasTypeSelect:
+				if int(m.selectedAtlasIdType) < len(atlasIdTypeOptions)-1 {
+					m.selectedAtlasIdType = m.selectedAtlasIdType + 1
+				}
+			}
+
+		case key.Matches(msg, m.keymap.PrevOption):
+			switch m.currentState {
+			case SourceSelect:
+				if m.selectedSource == atlas {
+					m.selectedSource = local
+				} else {
+					m.selectedSource = atlas
+				}
+			case AtlasTypeSelect:
+				if int(m.selectedAtlasIdType) > 0 {
+					m.selectedAtlasIdType = m.selectedAtlasIdType - 1
+				}
+			}
+
+		case key.Matches(msg, m.keymap.Toggle):
+			m.options.noFile = !m.options.noFile
+
+		case key.Matches(msg, m.keymap.Confirm):
+			m.currentState = Parsing
+			m.err = nil
+			return m, tea.Batch(
+				m.loadingSpinner.Tick,
+				// m.parseScriptCmd(),
+			)
+
+		case key.Matches(msg, m.keymap.Quit):
+			m.quitting = true
+			m.abort = true
 			return m, tea.Quit
-		case "down":
-			if m.currentState < 4 {
-				m.currentState++
-			}
-		case "up":
-			if m.currentState > 0 {
-				m.currentState--
-			}
 		}
 
 	case tea.WindowSizeMsg:
@@ -200,7 +339,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		verticalMarginHeight := headerHeight + footerHeight
 		m.terminalWidth = msg.Width
 		m.terminalHeight = msg.Height
-		v1, v2 := calculateViewportWidths(msg.Width)
+		w1, w2 := calculateViewportWidths(msg.Width)
 
 		if !m.ready {
 			// Since this program is using the full size of the viewport we
@@ -208,28 +347,41 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// we can initialize the viewport. The initial dimensions come in
 			// quickly, though asynchronously, which is why we wait for them
 			// here.
-			m.statePane = viewport.New(v1, msg.Height-verticalMarginHeight)
+			m.statePane = viewport.New(w1, msg.Height-verticalMarginHeight)
 			m.statePane.Style = paneStyle(0, m.theme)
 			m.statePane.YPosition = headerHeight
 			m.statePane.SetContent(m.statePaneContent())
 
-			m.optionsPane = viewport.New(v2, msg.Height-verticalMarginHeight)
+			m.optionsPane = viewport.New(w2, msg.Height-verticalMarginHeight)
 			m.optionsPane.Style = paneStyle(1, m.theme)
 			m.optionsPane.YPosition = headerHeight
 			m.optionsPane.SetContent(m.optionsPaneContent())
+
+			m.IdInput.SetHeight(msg.Height - verticalMarginHeight)
+			m.IdInput.SetWidth(w2)
 			m.ready = true
 		} else {
-			m.statePane.Width = v1
+			m.statePane.Width = w1
 			m.statePane.Height = msg.Height - verticalMarginHeight
 
-			m.optionsPane.Width = v2
+			m.optionsPane.Width = w2
 			m.optionsPane.Height = msg.Height - verticalMarginHeight
 		}
 	}
 
+	m.updateKeymap()
+
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
 	// Handle keyboard events in the viewport
 	m.statePane, cmd = m.statePane.Update(msg)
 	cmds = append(cmds, cmd)
+	m.IdInput, cmd = m.IdInput.Update(msg)
+	cmds = append(cmds, cmd)
+	if m.currentState == Parsing {
+		m.loadingSpinner, cmd = m.loadingSpinner.Update(msg)
+		cmds = append(cmds, cmd)
+	}
 	m.help, cmd = m.help.Update(msg)
 	cmds = append(cmds, cmd)
 
@@ -258,23 +410,9 @@ func (m Model) View() string {
 	)
 }
 
-var (
-	titleStyle = func() lipgloss.Style {
-		b := lipgloss.RoundedBorder()
-		b.Right = "├"
-		return lipgloss.NewStyle().BorderStyle(b).Padding(0, 1)
-	}()
-
-	infoStyle = func() lipgloss.Style {
-		b := lipgloss.RoundedBorder()
-		b.Left = "┤"
-		return titleStyle.BorderStyle(b)
-	}()
-)
-
 func (m Model) headerView() string {
-	title := titleStyle.Render("FGO Script Parser")
-	line := strings.Repeat("─", max(0, m.terminalWidth-lipgloss.Width(title)))
+	title := headerStyle("FGO Script Parser", m.theme)
+	line := strings.Repeat(lipgloss.NewStyle().Foreground(m.theme.BorderColor).Render("─"), max(0, m.terminalWidth-lipgloss.Width(title)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, title, line)
 }
 
