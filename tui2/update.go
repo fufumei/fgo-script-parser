@@ -43,16 +43,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		headerHeight := lipgloss.Height(m.headerView())
 		footerHeight := lipgloss.Height(m.footerView())
 		verticalMarginHeight := headerHeight + footerHeight
+		styles := table.DefaultStyles()
+		styles.Header = styles.Header.Foreground(m.theme.TertiaryColor)
+		styles.Selected = styles.Selected.Foreground(m.theme.SecondaryColor)
+
+		keys := table.KeyMap{
+			LineUp:   key.NewBinding(key.WithKeys("up")),
+			LineDown: key.NewBinding(key.WithKeys("down")),
+		}
 
 		t := table.New(
 			table.WithColumns(columns),
 			table.WithRows(rows),
-			table.WithFocused(true),
 			table.WithHeight(m.terminalHeight-verticalMarginHeight),
+			table.WithWidth(w2),
+			table.WithStyles(styles),
+			table.WithFocused(true),
+			table.WithKeyMap(keys),
 		)
 		m.resultsTable = t
-		// TODO: Add table styling
-
 		m.currentState = Results
 		m.resultsTable.Focus()
 	case parseFailureMsg:
@@ -150,6 +159,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateKeymap()
 			return m, nil // Prevent new line from double enter input
 
+		case key.Matches(msg, m.keymap.Copy):
+			// TODO: Copy to clipboard
+			m.resultsTable.SelectedRow()
+
 		case key.Matches(msg, m.keymap.Confirm):
 			m.currentState = Parsing
 			m.err = nil
@@ -209,6 +222,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.IdInput.SetHeight(msg.Height - verticalMarginHeight - idInputDscriptionHeight)
 			m.IdInput.SetWidth(w2)
+
+			m.resultsTable.SetColumns([]table.Column{
+				{Title: "Name", Width: int((float64(w2)) * 0.5)},
+				{Title: "Lines", Width: int((float64(w2)) * 0.25)},
+				{Title: "Characters", Width: int((float64(w2)) * 0.25)},
+			})
 		}
 	}
 

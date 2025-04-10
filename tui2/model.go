@@ -31,6 +31,7 @@ type Options struct {
 	// Separate file per ID entry
 	// Ignore subdirectory split for local files
 	// Calculate english word count (~ characters / 2) in results table
+	// Map known main story chapter names (can work for local too with some regex)
 }
 
 type State int

@@ -14,6 +14,9 @@ type KeyMap struct {
 	FocusInput    key.Binding
 	Confirm       key.Binding
 	Quit          key.Binding
+
+	Copy key.Binding
+	// CopyAll key.Binding
 }
 
 func DefaultKeybinds() KeyMap {
@@ -29,6 +32,9 @@ func DefaultKeybinds() KeyMap {
 		FocusInput:    key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "type"), key.WithDisabled()),
 		Confirm:       key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "confirm"), key.WithDisabled()),
 		Quit:          key.NewBinding(key.WithKeys("ctrl+q"), key.WithHelp("ctrl+q", "quit")),
+
+		Copy: key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "copy row"), key.WithDisabled()),
+		// CopyAll: key.NewBinding(key.WithKeys("ctrl+a"), key.WithHelp("ctrl+a", "copy all"), key.WithDisabled()),
 	}
 }
 
@@ -38,6 +44,8 @@ func (k KeyMap) ShortHelp() []key.Binding {
 		k.NextState,
 		k.PrevState,
 		k.NextOption,
+		k.Copy,
+		// k.CopyAll,
 		k.NextSubOption,
 		k.Toggle,
 		k.BlurInput,
@@ -72,10 +80,13 @@ func (m *Model) updateKeymap() {
 
 	m.keymap.NextState.SetEnabled(hasNextstate)
 	m.keymap.PrevState.SetEnabled(m.currentState != SourceSelect)
-	m.keymap.NextOption.SetEnabled(stateHasOptions)
+	m.keymap.NextOption.SetEnabled(stateHasOptions || m.resultsTable.Focused())
 	m.keymap.PrevOption.SetEnabled(stateHasOptions)
 	m.keymap.Toggle.SetEnabled(m.currentState == MiscOptions)
 	m.keymap.Confirm.SetEnabled(m.currentState == Confirm)
 	m.keymap.BlurInput.SetEnabled(m.currentState == IdInput && m.IdInput.Focused())
 	m.keymap.FocusInput.SetEnabled(m.currentState == IdInput && !m.IdInput.Focused())
+
+	m.keymap.Copy.SetEnabled(m.resultsTable.Focused())
+	// m.keymap.CopyAll.SetEnabled(m.resultsTable.Focused())
 }
