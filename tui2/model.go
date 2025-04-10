@@ -30,6 +30,7 @@ type Options struct {
 	noFile bool
 	// Separate file per ID entry
 	// Ignore subdirectory split for local files
+	// Calculate english word count (~ characters / 2) in results table
 }
 
 type State int

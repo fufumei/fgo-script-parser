@@ -19,7 +19,6 @@ func clearErrAfter(d time.Duration) tea.Cmd {
 	})
 }
 
-// TODO: Prevent changing state while entering IDs, have to press esc to blur and enter to focus again?
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
@@ -29,11 +28,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// TODO: Add hotkeys to copy single or all values
 		m.results = msg
 
-		// TODO: Calculate heights based on available height
+		_, w2 := calculateViewportWidths(m.terminalWidth)
 		columns := []table.Column{
-			{Title: "Name", Width: 25},
-			{Title: "Lines", Width: 25},
-			{Title: "Characters", Width: 25},
+			{Title: "Name", Width: int((float64(w2)) * 0.5)},
+			{Title: "Lines", Width: int((float64(w2)) * 0.25)},
+			{Title: "Characters", Width: int((float64(w2)) * 0.25)},
 		}
 
 		var rows []table.Row
@@ -85,7 +84,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case MiscOptions:
 				m.currentState = Confirm
 			case Confirm:
-				// TODO: Doesn't work
 				if len(m.results) > 0 {
 					m.currentState = Results
 				}
@@ -143,11 +141,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keymap.Toggle):
 			m.options.noFile = !m.options.noFile
 
+		case key.Matches(msg, m.keymap.BlurInput):
+			m.IdInput.Blur()
+
+		case key.Matches(msg, m.keymap.FocusInput):
+			m.IdInput.Focus()
+			m.IdInput.CursorEnd()
+			m.updateKeymap()
+			return m, nil // Prevent new line from double enter input
+
 		case key.Matches(msg, m.keymap.Confirm):
 			m.currentState = Parsing
 			m.err = nil
 			return m, tea.Batch(
 				m.loadingSpinner.Tick,
+				// TODO: This is buggy sometimes, only showing 0
 				m.timer.Reset(),
 				m.timer.Start(),
 				m.parseScriptCmd(),
