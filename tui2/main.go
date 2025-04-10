@@ -307,6 +307,9 @@ func (m Model) resultsContent() string {
 
 // TODO: Prevent changing state while entering IDs, have to press esc to blur and enter to focus again?
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
+
 	switch msg := msg.(type) {
 	case parseSuccessMsg:
 		// TODO: Add hotkeys to copy single or all values
@@ -342,7 +345,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case parseFailureMsg:
 		m.err = msg
 		m.currentState = Confirm
-		// return m, nil
+		cmds = append(cmds, tea.WindowSize(), clearErrAfter(10*time.Second))
+	case clearErrMsg:
+		m.err = nil
+		cmds = append(cmds, tea.WindowSize())
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.NextState):
@@ -366,9 +372,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentState = Confirm
 			case Confirm:
 				// TODO: Doesn't work
-				// if len(m.results) > 0 {
-				m.currentState = Results
-				// }
+				if len(m.results) > 0 {
+					m.currentState = Results
+				}
 			}
 
 		case key.Matches(msg, m.keymap.PrevState):
@@ -482,8 +488,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.updateKeymap()
 
-	var cmd tea.Cmd
-	var cmds []tea.Cmd
 	// Handle keyboard events in the viewport
 	m.statePane, cmd = m.statePane.Update(msg)
 	cmds = append(cmds, cmd)
@@ -501,6 +505,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
+}
+
+type clearErrMsg struct{}
+
+func clearErrAfter(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(t time.Time) tea.Msg {
+		return clearErrMsg{}
+	})
 }
 
 func (m Model) View() string {
