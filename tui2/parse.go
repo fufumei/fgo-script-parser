@@ -29,19 +29,27 @@ type parseFailureMsg error
 func (m Model) parseScriptCmd() tea.Cmd {
 	return func() tea.Msg {
 		var results []ParseResult
+		var err error
 		if strings.TrimSpace(m.IdInput.Value()) == "" {
 			return parseFailureMsg(errors.New("IDs cannot be empty"))
 		}
 
 		if m.selectedSource == atlas {
-			results = m.ParseFromAtlas()
+			results, err = m.ParseFromAtlas()
 		} else {
-			results = m.ParseFromLocal()
+			results, err = m.ParseFromLocal()
+		}
+
+		if err != nil {
+			return parseFailureMsg(err)
 		}
 
 		var writer *csv.Writer
 		if !m.options.noFile {
-			file := CreateFile()
+			file, err := CreateFile()
+			if err != nil {
+				return parseFailureMsg(err)
+			}
 			writer = csv.NewWriter(file)
 		} else {
 			writer = csv.NewWriter(os.Stdout)
@@ -61,19 +69,25 @@ func (m Model) parseScriptCmd() tea.Cmd {
 	}
 }
 
-func (m Model) ParseFromAtlas() []ParseResult {
+func (m Model) ParseFromAtlas() ([]ParseResult, error) {
 	var results []ParseResult
 
 	scripts := make(map[string]Script)
-	for _, id := range strings.Split(m.IdInput.Value(), "\n") {
+	for id := range strings.SplitSeq(m.IdInput.Value(), "\n") {
 		if m.selectedAtlasIdType == war {
-			s, n := FetchWarScripts(id)
+			s, n, err := FetchWarScripts(id)
+			if err != nil {
+				return nil, err
+			}
 			for _, script := range s {
 				scripts[script.ScriptId] = script
 			}
 			// The quest list for OC2 does not include the appendix
 			if id == "403" {
-				s = FetchQuestScripts("4000327")
+				s, err = FetchQuestScripts("4000327")
+				if err != nil {
+					return nil, err
+				}
 				for _, script := range s {
 					scripts[script.ScriptId] = script
 				}
@@ -86,7 +100,10 @@ func (m Model) ParseFromAtlas() []ParseResult {
 			result := ParseScripts(scr, n)
 			results = append(results, result)
 		} else if m.selectedAtlasIdType == quest {
-			s := FetchQuestScripts(id)
+			s, err := FetchQuestScripts(id)
+			if err != nil {
+				return nil, err
+			}
 			for _, script := range s {
 				scripts[script.ScriptId] = script
 			}
@@ -98,22 +115,25 @@ func (m Model) ParseFromAtlas() []ParseResult {
 			result := ParseScripts(scr, id)
 			results = append(results, result)
 		} else if m.selectedAtlasIdType == script {
-			result := FetchSingleScript(id)
+			result, err := FetchSingleScript(id)
+			if err != nil {
+				return nil, err
+			}
 			results = append(results, result)
 		}
 	}
 
-	return results
+	return results, nil
 }
 
-func (m Model) ParseFromLocal() []ParseResult {
+func (m Model) ParseFromLocal() ([]ParseResult, error) {
 	var results []ParseResult
 
 	for _, path := range strings.Split(m.IdInput.Value(), "\n") {
 		path = strings.Trim(path, "\"")
 		argInfo, err := os.Stat(path)
 		if err != nil {
-			log.Fatalf("Could not get file info for %s. %s", path, err)
+			return nil, parseFailureMsg(errors.New(fmt.Sprintf("Could not get file info for %s. %s", path, err)))
 		}
 
 		// If given path is a file, just open and count it, else traverse the directory
@@ -122,8 +142,7 @@ func (m Model) ParseFromLocal() []ParseResult {
 		} else {
 			data, err := os.ReadFile(path)
 			if err != nil {
-				// TODO: Return failure message instead
-				log.Fatalf("Can't read file: %s", path)
+				return nil, parseFailureMsg(errors.New(fmt.Sprintf("Can't read file: %s. %s", path, err)))
 			}
 			count := CleanAndCountScript(string(data))
 			results = append(results, ParseResult{
@@ -133,15 +152,15 @@ func (m Model) ParseFromLocal() []ParseResult {
 		}
 	}
 
-	return results
+	return results, nil
 }
 
-func CreateFile() *os.File {
+func CreateFile() (*os.File, error) {
 	file, err := os.Create("script-length.csv")
 	if err != nil {
-		log.Fatalf("Could not create output file. %s", err)
+		return nil, parseFailureMsg(errors.New(fmt.Sprintf("Could not create output file. %s", err)))
 	}
-	return file
+	return file, nil
 }
 
 func ParseScripts(scripts []Script, name string) ParseResult {
@@ -155,8 +174,10 @@ func ParseScripts(scripts []Script, name string) ParseResult {
 		go func(script Script) {
 			r, err := fetch.Get(script.Script)
 			if err != nil {
+				// TODO: Should this stop the whole thing?
 				log.Fatalf("Error fetching script " + script.ScriptId)
 				return
+				// return nil, parseFailureMsg(errors.New(fmt.Sprintf("Error fetching script %s. %s", script.ScriptId, err)))
 			}
 			count := CleanAndCountScript(r.String())
 			ch <- count
@@ -181,15 +202,17 @@ func ParseScripts(scripts []Script, name string) ParseResult {
 	}
 }
 
-func FetchWarScripts(id string) ([]Script, string) {
+func FetchWarScripts(id string) ([]Script, string, error) {
 	var result Response
 	response, err := fetch.Get(fmt.Sprintf("https://api.atlasacademy.io/nice/JP/war/%s?lang=en", id))
-	if err != nil {
-		log.Fatalf("Could not get data for war with ID %s", id)
+	if response.StatusCode() == 404 {
+		return nil, "", parseFailureMsg(errors.New(fmt.Sprintf("Could not get data for war with ID %s. Make sure the ID is correct.", id)))
+	} else if err != nil {
+		return nil, "", parseFailureMsg(errors.New(fmt.Sprintf("Could not get data for war with ID %s. %s", id, err)))
 	}
 	err = response.UnmarshalJSON(&result)
 	if err != nil {
-		log.Fatal("Error unmarshaling JSON:", err)
+		return nil, "", parseFailureMsg(errors.New(fmt.Sprintf("Error unmarshaling JSON: %s", err)))
 	}
 
 	var scripts []Script
@@ -203,18 +226,20 @@ func FetchWarScripts(id string) ([]Script, string) {
 			}
 		}
 	}
-	return scripts, result.Name
+	return scripts, result.Name, nil
 }
 
-func FetchQuestScripts(id string) []Script {
+func FetchQuestScripts(id string) ([]Script, error) {
 	var result Quest
 	response, err := fetch.Get(fmt.Sprintf("https://api.atlasacademy.io/nice/JP/quest/%s?lang=en", id))
-	if err != nil {
-		log.Fatalf("Could not get data for quest with ID %s", id)
+	if response.StatusCode() == 404 {
+		return nil, parseFailureMsg(errors.New(fmt.Sprintf("Could not get data for quest with ID %s. Make sure the ID is correct.", id)))
+	} else if err != nil {
+		return nil, parseFailureMsg(errors.New(fmt.Sprintf("Could not get data for quest with ID %s. %s", id, err)))
 	}
 	err = response.UnmarshalJSON(&result)
 	if err != nil {
-		log.Fatal("Error unmarshaling JSON:", err)
+		return nil, parseFailureMsg(errors.New(fmt.Sprintf("Error unmarshaling JSON: %s", err)))
 	}
 
 	var scripts []Script
@@ -222,28 +247,28 @@ func FetchQuestScripts(id string) []Script {
 		scripts = append(scripts, phase.Scripts...)
 	}
 
-	return scripts
+	return scripts, nil
 }
 
-func FetchSingleScript(id string) ParseResult {
-	r, err := fetch.Get(fmt.Sprintf("https://static.atlasacademy.io/JP/Script/%s/%s.txt", id[0:2], id))
-	if err != nil {
-		log.Fatalf("Error fetching script " + id)
-		return ParseResult{} // TODO: Actually return error here
+func FetchSingleScript(id string) (ParseResult, error) {
+	response, err := fetch.Get(fmt.Sprintf("https://static.atlasacademy.io/JP/Script/%s/%s.txt", id[0:2], id))
+	if response.StatusCode() == 404 {
+		return ParseResult{}, parseFailureMsg(errors.New(fmt.Sprintf("Error fetching script %s. Make sure the ID is correct.", id)))
+	} else if err != nil {
+		return ParseResult{}, parseFailureMsg(errors.New(fmt.Sprintf("Error fetching script %s. %s", id, err)))
 	}
-	count := CleanAndCountScript(r.String())
+	count := CleanAndCountScript(response.String())
 
 	return ParseResult{
 		name:  id,
 		count: count,
-	}
+	}, nil
 }
 
-func TraverseDirectories(path string, results *[]ParseResult) {
+func TraverseDirectories(path string, results *[]ParseResult) error {
 	entries, err := os.ReadDir(path)
-	// TODO: Return failure message
 	if err != nil {
-		fmt.Println("Unable to get entries for directory ", path)
+		return parseFailureMsg(errors.New(fmt.Sprintf("Unable to get entries for directory %s", path)))
 	}
 
 	hasDirectory := slices.ContainsFunc(entries, func(e fs.DirEntry) bool {
@@ -253,9 +278,12 @@ func TraverseDirectories(path string, results *[]ParseResult) {
 	// If directories exist, call this recursively for each one until we hit the lowest level
 	if hasDirectory {
 		for _, e := range entries {
-			TraverseDirectories(filepath.Join(path, e.Name()), results)
+			err = TraverseDirectories(filepath.Join(path, e.Name()), results)
+			if err != nil {
+				break
+			}
 		}
-		return
+		return err
 	}
 
 	lines := 0
@@ -264,8 +292,7 @@ func TraverseDirectories(path string, results *[]ParseResult) {
 	for _, e := range entries {
 		data, err := os.ReadFile(filepath.Join(path, e.Name()))
 		if err != nil {
-			// TODO: Return failure message
-			log.Fatalf("Can't read file: %s", filepath.Join(path, e.Name()))
+			return parseFailureMsg(errors.New(fmt.Sprintf("Can't read file: %s", filepath.Join(path, e.Name()))))
 		}
 		count := CleanAndCountScript(string(data))
 		lines += count.lines
@@ -278,6 +305,8 @@ func TraverseDirectories(path string, results *[]ParseResult) {
 			characters: characters,
 		},
 	})
+
+	return nil
 }
 
 func CleanAndCountScript(data string) Count {
