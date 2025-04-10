@@ -77,8 +77,21 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 
 func (m *Model) updateKeymap() {
 	stateHasOptions := m.currentState == SourceSelect || m.currentState == AtlasTypeSelect
+	hasNextstate := true
 
-	m.keymap.NextState.SetEnabled(m.currentState != Confirm)
+	if m.currentState == Results {
+		hasNextstate = false
+	} else if m.currentState == Confirm {
+		if len(m.results) > 0 {
+			hasNextstate = true
+		} else {
+			hasNextstate = false
+		}
+	} else {
+		hasNextstate = true
+	}
+
+	m.keymap.NextState.SetEnabled(hasNextstate)
 	m.keymap.PrevState.SetEnabled(m.currentState != SourceSelect)
 	m.keymap.NextOption.SetEnabled(stateHasOptions)
 	m.keymap.PrevOption.SetEnabled(stateHasOptions)
