@@ -105,15 +105,15 @@ type Model struct {
 	timer                  stopwatch.Model
 	resultsTable           table.Model
 
-	// currentOption, currentSubOption int
-	currentState        State
-	selectedSource      Source
-	selectedAtlasIdType AtlasIdType
-	options             Options
-	results             []ParseResult
-	quitting            bool
-	abort               bool
-	err                 error
+	currentOption, currentSubOption int
+	currentState                    State
+	selectedSource                  Source
+	selectedAtlasIdType             AtlasIdType
+	options                         Options
+	results                         []ParseResult
+	quitting                        bool
+	abort                           bool
+	err                             error
 }
 
 func NewModel() Model {
@@ -195,6 +195,11 @@ func (m Model) optionsPaneContent() string {
 func (m Model) sourceSelectContent() string {
 	var sb strings.Builder
 
+	sb.WriteString(lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("Source"))
+	sb.WriteString("\n")
+	sb.WriteString(renderDefault("The source from which to fetch scripts.\nBoth options accept a list of scripts to parse.\nNote that parsing from Atlas requires an internet connection.", m.theme))
+	sb.WriteString("\n\n")
+
 	for _, o := range sourceOptions {
 		prefix := "◌ "
 		if m.selectedSource == o.value {
@@ -215,6 +220,11 @@ func (m Model) sourceSelectContent() string {
 func (m Model) atlasIdTypeSelectContent() string {
 	var sb strings.Builder
 
+	sb.WriteString(lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("Type"))
+	sb.WriteString("\n")
+	sb.WriteString(renderDefault("The type of Atlas ID to input.\nIt's currently not possible to parse multiple types at once.", m.theme))
+	sb.WriteString("\n\n")
+
 	for _, o := range atlasIdTypeOptions {
 		prefix := "◌ "
 		if m.selectedAtlasIdType == o.value {
@@ -233,18 +243,32 @@ func (m Model) atlasIdTypeSelectContent() string {
 }
 
 func (m Model) idInputContent() string {
-	return m.IdInput.View()
+	var sb strings.Builder
+
+	sb.WriteString(lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("IDs"))
+	sb.WriteString("\n")
+	sb.WriteString(renderDefault("Enter the IDs (if Atlas) or filepaths (if local) to parse from.\nOne ID/filepath per line.\nNote that filepaths cannot be relative.", m.theme))
+	sb.WriteString("\n\n")
+
+	sb.WriteString(m.IdInput.View())
+
+	return sb.String()
 }
 
 // TODO: Clean this up like the above
 func (m Model) miscOptionsContent() string {
 	var sb strings.Builder
 
+	sb.WriteString(lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("Options"))
+	sb.WriteString("\n")
+	sb.WriteString(renderDefault("Miscellaneous options for parsing.", m.theme))
+	sb.WriteString("\n\n")
+
 	prefix := "☐ "
 	if m.options.noFile {
 		prefix = renderSelected("☑  ", m.theme)
 	}
-	title := renderSelected("No file", m.theme)
+	title := renderSelected("No output file", m.theme)
 	desc := renderDescription("If checked, the result will only print to the terminal,\notherwise also outputs to a csv on the same level as the script.", m.theme)
 
 	sb.WriteString(
@@ -288,7 +312,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// TODO: Add hotkeys to copy single or all values
 		m.results = msg
 
-		// TODO: Calculate heights based on available width
+		// TODO: Calculate heights based on available height
 		columns := []table.Column{
 			{Title: "Name", Width: 25},
 			{Title: "Lines", Width: 25},
@@ -487,7 +511,6 @@ func (m Model) View() string {
 	}
 
 	m.statePane.SetContent(m.statePaneContent())
-	// TODO: Add a header text to explain each step
 	m.optionsPane.SetContent(m.optionsPaneContent())
 
 	return lipgloss.JoinVertical(

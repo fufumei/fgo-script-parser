@@ -56,7 +56,7 @@ func paneStyle(pos int, theme Theme) lipgloss.Style {
 		return lipgloss.NewStyle().Padding(0, 1).BorderStyle(lipgloss.NormalBorder()).
 			BorderForeground(theme.BorderColor).BorderRight(true)
 	} else {
-		return lipgloss.NewStyle().Padding(2, 0, 0, 3)
+		return lipgloss.NewStyle().Padding(0, 0, 0, 3)
 	}
 }
 
