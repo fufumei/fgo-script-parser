@@ -269,7 +269,11 @@ func FetchWarScripts(id string) ([]Script, string, error) {
 			}
 		}
 	}
-	return scripts, result.Name, nil
+	name := result.Name
+	if result.Name == "-" {
+		name = fmt.Sprintf("%s (%s)", result.Name, id)
+	}
+	return scripts, name, nil
 }
 
 func FetchQuestScripts(id string) ([]Script, error) {
