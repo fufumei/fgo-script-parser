@@ -102,6 +102,10 @@ func (m Model) ParseFromAtlas() ([]ParseResult, error) {
 
 	scripts := make(map[string]Script)
 	for id := range strings.SplitSeq(m.IdInput.Value(), "\n") {
+		// Get rid of empty rows
+		if strings.Trim(id, " ") == "" {
+			continue
+		}
 		if m.selectedAtlasIdType == war {
 			s, n, err := FetchWarScripts(id)
 			if err != nil {
@@ -157,7 +161,11 @@ func (m Model) ParseFromAtlas() ([]ParseResult, error) {
 func (m Model) ParseFromLocal() ([]ParseResult, error) {
 	var results []ParseResult
 
-	for _, path := range strings.Split(m.IdInput.Value(), "\n") {
+	for path := range strings.SplitSeq(m.IdInput.Value(), "\n") {
+		// Get rid of empty rows
+		if strings.Trim(path, " ") == "" {
+			continue
+		}
 		path = strings.Trim(path, "\"")
 		argInfo, err := os.Stat(path)
 		if err != nil {
