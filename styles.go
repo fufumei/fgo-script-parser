@@ -97,6 +97,11 @@ func renderError(s string, theme Theme) string {
 	return style.Render(s)
 }
 
+func renderNotification(s string, theme Theme) string {
+	style := lipgloss.NewStyle().Foreground(theme.SuccessColor)
+	return style.Render(s)
+}
+
 func truncateText(s string, w int) string {
 	padding := 10
 	if runewidth.StringWidth(s) <= w-padding {

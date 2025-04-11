@@ -69,6 +69,7 @@ type Model struct {
 	quitting            bool
 	abort               bool
 	err                 error
+	notification        clipboardMsg
 }
 
 func NewModel() Model {

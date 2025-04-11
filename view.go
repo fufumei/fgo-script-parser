@@ -198,14 +198,23 @@ func (m Model) footerView() string {
 		Height(FooterHeight - 1). // top border
 		Width(m.terminalWidth)
 
-	errRender := ""
+	notif := ""
 	if m.err != nil {
-		errRender = renderError(m.err.Error(), m.theme)
+		notif = renderError(m.err.Error(), m.theme)
 		return footerStyle.Render(
 			lipgloss.JoinVertical(
 				lipgloss.Left,
 				m.help.View(m.keymap),
-				errRender,
+				notif,
+			),
+		)
+	} else if m.notification.message != "" {
+		notif = renderNotification(m.notification.message, m.theme)
+		return footerStyle.Render(
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				m.help.View(m.keymap),
+				notif,
 			),
 		)
 	}

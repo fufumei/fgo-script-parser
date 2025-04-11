@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"golang.design/x/clipboard"
 )
 
 type clearErrMsg struct{}
@@ -19,13 +20,28 @@ func clearErrAfter(d time.Duration) tea.Cmd {
 	})
 }
 
+func clearNotifAfter(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(t time.Time) tea.Msg {
+		return clipboardMsg{}
+	})
+}
+
+type clipboardMsg struct {
+	message string
+}
+
+func (m Model) copyToClipboard() tea.Msg {
+	row := m.resultsTable.SelectedRow()
+	clipboard.Write(clipboard.FmtText, fmt.Appendf(nil, "%s, %s, %s", row[0], row[1], row[2]))
+	return clipboardMsg{message: "Row copied to clipboard!"}
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case parseSuccessMsg:
-		// TODO: Add hotkeys to copy single or all values
 		m.results = msg
 
 		_, w2 := calculateViewportWidths(m.terminalWidth)
@@ -71,6 +87,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case clearErrMsg:
 		m.err = nil
 		cmds = append(cmds, tea.WindowSize())
+	case clipboardMsg:
+		m.notification = msg
+		cmds = append(cmds, tea.WindowSize(), clearNotifAfter(3*time.Second))
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.NextState):
@@ -160,8 +179,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil // Prevent new line from double enter input
 
 		case key.Matches(msg, m.keymap.Copy):
-			// TODO: Copy to clipboard
-			m.resultsTable.SelectedRow()
+			cmds = append(cmds, m.copyToClipboard)
 
 		case key.Matches(msg, m.keymap.Confirm):
 			m.currentState = Parsing
