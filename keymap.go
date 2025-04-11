@@ -87,6 +87,6 @@ func (m *Model) updateKeymap() {
 	m.keymap.BlurInput.SetEnabled(m.currentState == IdInput && m.IdInput.Focused())
 	m.keymap.FocusInput.SetEnabled(m.currentState == IdInput && !m.IdInput.Focused())
 
-	m.keymap.Copy.SetEnabled(m.resultsTable.Focused())
+	m.keymap.Copy.SetEnabled(m.currentState == Results)
 	// m.keymap.CopyAll.SetEnabled(m.resultsTable.Focused())
 }
