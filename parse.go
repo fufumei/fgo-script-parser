@@ -43,8 +43,9 @@ type Quest struct {
 }
 
 type Response struct {
-	Name  string `json:"name"`
-	Spots []struct {
+	Name     string `json:"name"`
+	LongName string `json:"longName"`
+	Spots    []struct {
 		Quests []Quest
 	}
 }
@@ -269,9 +270,10 @@ func FetchWarScripts(id string) ([]Script, string, error) {
 			}
 		}
 	}
+	// TODO: Might be needed for the other fetching functions as well
 	name := result.Name
 	if result.Name == "-" {
-		name = fmt.Sprintf("%s (%s)", result.Name, id)
+		name = result.LongName
 	}
 	return scripts, name, nil
 }
