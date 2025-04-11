@@ -27,12 +27,18 @@ const (
 )
 
 type Options struct {
-	noFile bool
-	// Separate file per ID entry
+	noFile           bool
+	includeWordCount bool
 	// Ignore subdirectory split for local files
-	// Calculate english word count (~ characters / 2) in results table
 	// Map known main story chapter names (can work for local too with some regex)
 }
+
+type OptionsEnum int
+
+const (
+	NoFile OptionsEnum = iota
+	IncludeWordCount
+)
 
 type State int
 
@@ -59,8 +65,7 @@ type Model struct {
 	timer                  stopwatch.Model
 	resultsTable           table.Model
 
-	currentOption int
-	// currentSubOption int
+	currentOption       OptionsEnum
 	currentState        State
 	selectedSource      Source
 	selectedAtlasIdType AtlasIdType

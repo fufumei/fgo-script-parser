@@ -63,7 +63,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 }
 
 func (m *Model) updateKeymap() {
-	stateHasOptions := m.currentState == SourceSelect || m.currentState == AtlasTypeSelect
+	stateHasOptions := m.currentState == SourceSelect || m.currentState == AtlasTypeSelect || m.currentState == MiscOptions
 	hasNextstate := true
 
 	if m.currentState == Results {

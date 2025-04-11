@@ -45,15 +45,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.results = msg
 
 		_, w2 := calculateViewportWidths(m.terminalWidth)
-		columns := []table.Column{
-			{Title: "Name", Width: int((float64(w2)) * 0.5)},
-			{Title: "Lines", Width: int((float64(w2)) * 0.25)},
-			{Title: "Characters", Width: int((float64(w2)) * 0.25)},
-		}
-
+		var columns []table.Column
 		var rows []table.Row
-		for _, r := range msg {
-			rows = append(rows, table.Row{r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)})
+
+		if m.options.includeWordCount {
+			columns = []table.Column{
+				{Title: "Name", Width: int((float64(w2)) * 0.4)},
+				{Title: "Lines", Width: int((float64(w2)) * 0.2)},
+				{Title: "Characters", Width: int((float64(w2)) * 0.2)},
+				{Title: "Words", Width: int((float64(w2)) * 0.2)},
+			}
+			for _, r := range msg {
+				rows = append(rows, table.Row{r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters), fmt.Sprint(r.count.characters / 2)})
+			}
+		} else {
+			columns = []table.Column{
+				{Title: "Name", Width: int((float64(w2)) * 0.5)},
+				{Title: "Lines", Width: int((float64(w2)) * 0.25)},
+				{Title: "Characters", Width: int((float64(w2)) * 0.25)},
+			}
+			for _, r := range msg {
+				rows = append(rows, table.Row{r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)})
+			}
 		}
 
 		headerHeight := lipgloss.Height(m.headerView())
@@ -150,6 +163,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if int(m.selectedAtlasIdType) < len(atlasIdTypeOptions)-1 {
 					m.selectedAtlasIdType = m.selectedAtlasIdType + 1
 				}
+			case MiscOptions:
+				if int(m.currentOption) < len(miscOptions)-1 {
+					m.currentOption = m.currentOption + 1
+				}
 			}
 
 		case key.Matches(msg, m.keymap.PrevOption):
@@ -164,10 +181,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if int(m.selectedAtlasIdType) > 0 {
 					m.selectedAtlasIdType = m.selectedAtlasIdType - 1
 				}
+			case MiscOptions:
+				if int(m.currentOption) > 0 {
+					m.currentOption = m.currentOption - 1
+				}
 			}
 
 		case key.Matches(msg, m.keymap.Toggle):
-			m.options.noFile = !m.options.noFile
+			switch m.currentOption {
+			case NoFile:
+				m.options.noFile = !m.options.noFile
+			case IncludeWordCount:
+				m.options.includeWordCount = !m.options.includeWordCount
+			}
 
 		case key.Matches(msg, m.keymap.BlurInput):
 			m.IdInput.Blur()

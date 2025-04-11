@@ -141,19 +141,26 @@ func (m Model) miscOptionsContent() string {
 	sb.WriteString(renderDefault("Miscellaneous options for parsing.", m.theme))
 	sb.WriteString("\n\n")
 
-	prefix := "☐ "
-	if m.options.noFile {
-		prefix = renderSelected("☑  ", m.theme)
-	}
-	title := renderSelected("No output file", m.theme)
-	desc := renderDescription("If checked, the result will only print to the terminal,\notherwise also outputs to a csv on the same level as the script.", m.theme)
+	for _, o := range miscOptions {
+		prefix := "☐ "
+		switch o.value {
+		case NoFile:
+			if m.options.noFile {
+				prefix = "☑  "
+			}
+		case IncludeWordCount:
+			if m.options.includeWordCount {
+				prefix = "☑  "
+			}
+		}
 
-	sb.WriteString(
-		lipgloss.JoinVertical(
-			lipgloss.Left,
-			prefix+title,
-			desc,
-		))
+		if m.currentOption == o.value {
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", renderSelected(o.Title, m.theme), renderDescription(o.Description, m.theme)))
+		} else {
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", renderDefault(o.Title, m.theme), renderDescription(o.Description, m.theme)))
+		}
+		sb.WriteString("\n")
+	}
 
 	return sb.String()
 }
@@ -234,7 +241,6 @@ func (m Model) idInputDescriptionView() string {
 func calculateViewportWidths(terminalWidth int) (int, int) {
 	paneOne := 17 // TODO: Magic number
 	paneTwo := terminalWidth - paneOne
-	// paneTwo := math.Floor(float64(terminalWidth) * 0.75)
 	return int(paneOne), int(paneTwo)
 }
 

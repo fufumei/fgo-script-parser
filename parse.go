@@ -83,11 +83,18 @@ func (m Model) parseScriptCmd() tea.Cmd {
 			writer = csv.NewWriter(os.Stdout)
 		}
 		writer.Comma = '\t'
-		writer.Write([]string{"Name", "Lines", "Characters"})
 
 		// TODO: Sort
-		for _, r := range results {
-			writer.Write([]string{r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)})
+		if m.options.includeWordCount {
+			writer.Write([]string{"Name", "Lines", "Characters, Words"})
+			for _, r := range results {
+				writer.Write([]string{r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)})
+			}
+		} else {
+			writer.Write([]string{"Name", "Lines", "Characters"})
+			for _, r := range results {
+				writer.Write([]string{r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters), fmt.Sprint(r.count.characters / 2)})
+			}
 		}
 
 		if !m.options.noFile {

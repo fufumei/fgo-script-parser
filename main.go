@@ -19,6 +19,12 @@ type AtlasIdTypeOption struct {
 	value       AtlasIdType
 }
 
+type MiscOption struct {
+	Title       string
+	Description string
+	value       OptionsEnum
+}
+
 var (
 	sourceOptions = []SourceOption{
 		{
@@ -47,8 +53,19 @@ var (
 			Title:       "Script",
 			Description: "Parse specific scripts individually.\nEx: 0100000111 for Fuyuki chapter 1 post battle scene",
 			value:       script,
+		}}
+
+	miscOptions = []MiscOption{
+		{
+			Title:       "No output file",
+			Description: "If checked, the result will only print to the terminal,\notherwise also outputs to a csv on the same level as the script.",
+			value:       NoFile,
 		},
-	}
+		{
+			Title:       "Include word count",
+			Description: "Calculates the approximate English word count for each result.\nEnglish word count is conventionally characters/2.",
+			value:       IncludeWordCount,
+		}}
 )
 
 func main() {
