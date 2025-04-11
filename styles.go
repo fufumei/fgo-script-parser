@@ -6,14 +6,9 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-const (
-	HeaderHeight = 3
-	FooterHeight = 2
-)
+const FooterHeight = 2
 
 type Theme struct {
-	SpinnerType spinner.Spinner
-
 	BodyColor      lipgloss.Color
 	EmphasisColor  lipgloss.Color
 	BorderColor    lipgloss.Color
@@ -28,10 +23,12 @@ type Theme struct {
 	Gray           lipgloss.Color
 	Black          lipgloss.Color
 	Gold           lipgloss.Color
+
+	SpinnerType spinner.Spinner
 }
 
-func GetDefaultTheme() Theme {
-	theme := Theme{
+func DefaultTheme() Theme {
+	return Theme{
 		BodyColor:      "#D3C6AA",
 		EmphasisColor:  "#E67E80",
 		BorderColor:    "#2C5CA4",
@@ -46,59 +43,58 @@ func GetDefaultTheme() Theme {
 		Gray:           "#75828a",
 		Black:          "#343F44",
 		Gold:           "#f4cf0b",
-		SpinnerType:    spinner.Line,
+
+		SpinnerType: spinner.Line,
 	}
-	return theme
 }
 
-func paneStyle(pos int, theme Theme) lipgloss.Style {
+func (t Theme) paneStyle(pos int) lipgloss.Style {
 	if pos == 0 {
-		return lipgloss.NewStyle().Padding(0, 1).BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(theme.BorderColor).BorderRight(true)
+		return lipgloss.NewStyle().Padding(0, 1).BorderStyle(lipgloss.NormalBorder()).BorderForeground(t.BorderColor).BorderRight(true)
 	} else {
 		return lipgloss.NewStyle().Padding(0, 0, 0, 3)
 	}
 }
 
-func headerStyle(s string, theme Theme) string {
+func (t Theme) renderHeader(s string) string {
 	b := lipgloss.RoundedBorder()
 	b.Right = "├"
-	style := lipgloss.NewStyle().BorderStyle(b).BorderForeground(theme.BorderColor).Foreground(theme.Gold).Padding(0, 1)
+	style := lipgloss.NewStyle().BorderStyle(b).BorderForeground(t.BorderColor).Foreground(t.Gold).Padding(0, 1)
 	return style.Render(s)
 }
 
-func renderPaneTitle(s string, theme Theme) string {
-	style := lipgloss.NewStyle().Foreground(theme.TertiaryColor).Padding(0, 1).Bold(true)
+func (t Theme) renderPaneTitle(s string) string {
+	style := lipgloss.NewStyle().Foreground(t.TertiaryColor).Padding(0, 1).Bold(true)
 	return style.Render(s) + "\n\n"
 }
 
-func renderInactiveState(s string, theme Theme) string {
-	style := lipgloss.NewStyle().Foreground(theme.Gray)
+func (t Theme) renderInactiveState(s string) string {
+	style := lipgloss.NewStyle().Foreground(t.Gray)
 	return style.Render(s)
 }
 
-func renderSelected(s string, theme Theme) string {
-	style := lipgloss.NewStyle().Foreground(theme.SecondaryColor)
+func (t Theme) renderSelected(s string) string {
+	style := lipgloss.NewStyle().Foreground(t.SecondaryColor)
 	return style.Render(s)
 }
 
-func renderDescription(s string, theme Theme) string {
-	style := lipgloss.NewStyle().PaddingLeft(2).Foreground(theme.Gray)
+func (t Theme) renderDescription(s string) string {
+	style := lipgloss.NewStyle().PaddingLeft(2).Foreground(t.Gray)
 	return style.Render(s)
 }
 
-func renderDefault(s string, theme Theme) string {
-	style := lipgloss.NewStyle().Foreground(theme.PrimaryColor)
+func (t Theme) renderNormalText(s string) string {
+	style := lipgloss.NewStyle().Foreground(t.PrimaryColor)
 	return style.Render(s)
 }
 
-func renderError(s string, theme Theme) string {
-	style := lipgloss.NewStyle().Foreground(theme.ErrorColor)
+func (t Theme) renderError(s string) string {
+	style := lipgloss.NewStyle().Foreground(t.ErrorColor)
 	return style.Render(s)
 }
 
-func renderNotification(s string, theme Theme) string {
-	style := lipgloss.NewStyle().Foreground(theme.SuccessColor)
+func (t Theme) renderNotification(s string) string {
+	style := lipgloss.NewStyle().Foreground(t.SuccessColor)
 	return style.Render(s)
 }
 

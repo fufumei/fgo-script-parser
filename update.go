@@ -240,12 +240,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// quickly, though asynchronously, which is why we wait for them
 			// here.
 			m.statePane = viewport.New(w1, msg.Height-verticalMarginHeight)
-			m.statePane.Style = paneStyle(0, m.theme)
+			m.statePane.Style = m.theme.paneStyle(0)
 			m.statePane.YPosition = headerHeight
 			m.statePane.SetContent(m.statePaneContent())
 
 			m.optionsPane = viewport.New(w2, msg.Height-verticalMarginHeight)
-			m.optionsPane.Style = paneStyle(1, m.theme)
+			m.optionsPane.Style = m.theme.paneStyle(1)
 			m.optionsPane.YPosition = headerHeight
 			m.optionsPane.SetContent(m.optionsPaneContent())
 

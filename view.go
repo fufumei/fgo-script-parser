@@ -35,7 +35,7 @@ func (m Model) statePaneContent() string {
 	if len(m.results) > 0 {
 		steps = append(steps, "Results")
 	}
-	sb.WriteString(renderPaneTitle("Steps", m.theme))
+	sb.WriteString(m.theme.renderPaneTitle("Steps"))
 	paneWidth, _ := calculateViewportWidths(m.terminalWidth)
 
 	for i, step := range steps {
@@ -45,9 +45,9 @@ func (m Model) statePaneContent() string {
 		}
 
 		if State(i) == m.currentState {
-			sb.WriteString(renderSelected(prefix+truncateText(step, paneWidth), m.theme))
+			sb.WriteString(m.theme.renderSelected(prefix + truncateText(step, paneWidth)))
 		} else {
-			sb.WriteString(renderInactiveState(prefix+truncateText(step, paneWidth), m.theme))
+			sb.WriteString(m.theme.renderInactiveState(prefix + truncateText(step, paneWidth)))
 		}
 		sb.WriteString("\n")
 	}
@@ -79,7 +79,7 @@ func (m Model) sourceSelectContent() string {
 
 	sb.WriteString(lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("Source"))
 	sb.WriteString("\n")
-	sb.WriteString(renderDefault("The source from which to fetch scripts.\nBoth options accept a list of scripts to parse.\nNote that parsing from Atlas requires an internet connection.", m.theme))
+	sb.WriteString(m.theme.renderNormalText("The source from which to fetch scripts.\nBoth options accept a list of scripts to parse.\nNote that parsing from Atlas requires an internet connection."))
 	sb.WriteString("\n\n")
 
 	for _, o := range sourceOptions {
@@ -89,9 +89,9 @@ func (m Model) sourceSelectContent() string {
 		}
 
 		if m.selectedSource == o.value {
-			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", renderSelected(o.Title, m.theme), renderDescription(o.Description, m.theme)))
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderSelected(o.Title), m.theme.renderDescription(o.Description)))
 		} else {
-			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", renderDefault(o.Title, m.theme), renderDescription(o.Description, m.theme)))
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderNormalText(o.Title), m.theme.renderDescription(o.Description)))
 		}
 		sb.WriteString("\n")
 	}
@@ -104,7 +104,7 @@ func (m Model) atlasIdTypeSelectContent() string {
 
 	sb.WriteString(lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("Type"))
 	sb.WriteString("\n")
-	sb.WriteString(renderDefault("The type of Atlas ID to input.\nIt's currently not possible to parse multiple types at once.", m.theme))
+	sb.WriteString(m.theme.renderNormalText("The type of Atlas ID to input.\nIt's currently not possible to parse multiple types at once."))
 	sb.WriteString("\n\n")
 
 	for _, o := range atlasIdTypeOptions {
@@ -114,9 +114,9 @@ func (m Model) atlasIdTypeSelectContent() string {
 		}
 
 		if m.selectedAtlasIdType == o.value {
-			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", renderSelected(o.Title, m.theme), renderDescription(o.Description, m.theme)))
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderSelected(o.Title), m.theme.renderDescription(o.Description)))
 		} else {
-			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", renderDefault(o.Title, m.theme), renderDescription(o.Description, m.theme)))
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderNormalText(o.Title), m.theme.renderDescription(o.Description)))
 		}
 		sb.WriteString("\n")
 	}
@@ -138,7 +138,7 @@ func (m Model) miscOptionsContent() string {
 
 	sb.WriteString(lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("Options"))
 	sb.WriteString("\n")
-	sb.WriteString(renderDefault("Miscellaneous options for parsing.", m.theme))
+	sb.WriteString(m.theme.renderNormalText("Miscellaneous options for parsing."))
 	sb.WriteString("\n\n")
 
 	for _, o := range miscOptions {
@@ -155,9 +155,9 @@ func (m Model) miscOptionsContent() string {
 		}
 
 		if m.currentOption == o.value {
-			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", renderSelected(o.Title, m.theme), renderDescription(o.Description, m.theme)))
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderSelected(o.Title), m.theme.renderDescription(o.Description)))
 		} else {
-			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", renderDefault(o.Title, m.theme), renderDescription(o.Description, m.theme)))
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderNormalText(o.Title), m.theme.renderDescription(o.Description)))
 		}
 		sb.WriteString("\n")
 	}
@@ -190,7 +190,7 @@ func (m Model) resultsContent() string {
 }
 
 func (m Model) headerView() string {
-	title := headerStyle("FGO Script Parser", m.theme)
+	title := m.theme.renderHeader("FGO Script Parser")
 	line := strings.Repeat(lipgloss.NewStyle().Foreground(m.theme.BorderColor).Render("─"), max(0, m.terminalWidth-lipgloss.Width(title)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, title, line)
 }
@@ -207,7 +207,7 @@ func (m Model) footerView() string {
 
 	notif := ""
 	if m.err != nil {
-		notif = renderError(m.err.Error(), m.theme)
+		notif = m.theme.renderError(m.err.Error())
 		return footerStyle.Render(
 			lipgloss.JoinVertical(
 				lipgloss.Left,
@@ -216,7 +216,7 @@ func (m Model) footerView() string {
 			),
 		)
 	} else if m.notification.message != "" {
-		notif = renderNotification(m.notification.message, m.theme)
+		notif = m.theme.renderNotification(m.notification.message)
 		return footerStyle.Render(
 			lipgloss.JoinVertical(
 				lipgloss.Left,
@@ -233,7 +233,7 @@ func (m Model) idInputDescriptionView() string {
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("IDs"),
-		renderDefault("Enter the IDs (if Atlas) or filepaths (if local) to parse from.\nOne ID/filepath per line.\nNote that filepaths cannot be relative.", m.theme),
+		m.theme.renderNormalText("Enter the IDs (if Atlas) or filepaths (if local) to parse from.\nOne ID/filepath per line.\nNote that filepaths cannot be relative."),
 		"\n",
 	)
 }
