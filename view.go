@@ -269,14 +269,11 @@ func (m Model) idInputDescriptionView() string {
 		case script:
 			sb.WriteString("Enter the script IDs to parse from.")
 		}
-		sb.WriteString("\n")
-		sb.WriteString("Only one ID per line.")
+		sb.WriteString("\nOnly one ID per line.")
 	case local:
 		sb.WriteString("Enter the filepaths to local files to parse from.")
-		sb.WriteString("\n")
-		sb.WriteString("Only one filepath per line.")
-		sb.WriteString("\n")
-		sb.WriteString("Note that filepaths must be absolute.")
+		sb.WriteString("\nFilepath can point to a directory or directly to a file (must include file extension).")
+		sb.WriteString("\nOnly one filepath per line.\nNote that filepaths must be absolute.")
 	}
 
 	return lipgloss.JoinVertical(
