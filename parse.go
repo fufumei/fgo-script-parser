@@ -88,12 +88,12 @@ func (m Model) parseScriptCmd() tea.Cmd {
 		if m.options.includeWordCount {
 			writer.Write([]string{"Id", "Name", "Lines", "Characters, Words"})
 			for _, r := range results {
-				writer.Write([]string{r.id, r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)})
+				writer.Write([]string{r.id, r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters), fmt.Sprint(r.count.characters / 2)})
 			}
 		} else {
 			writer.Write([]string{"Id", "Name", "Lines", "Characters"})
 			for _, r := range results {
-				writer.Write([]string{r.id, r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters), fmt.Sprint(r.count.characters / 2)})
+				writer.Write([]string{r.id, r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)})
 			}
 		}
 
