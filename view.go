@@ -7,6 +7,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const (
+	prefix           = "◌ "
+	selectedPrefix   = "◉ "
+	checkbox         = "☐ "
+	selectedCheckbox = "☑  "
+)
+
 func (m Model) View() string {
 	if !m.ready {
 		return "\n  Initializing..."
@@ -30,24 +37,32 @@ func (m Model) View() string {
 }
 
 func (m Model) statePaneContent() string {
-	var sb strings.Builder
-	steps := []string{"Source", "Type", "IDs", "Options", "Parse"}
-	if len(m.results) > 0 {
-		steps = append(steps, "Results")
+	// Nicer with a map but iteration over map is random order
+	steps := []struct {
+		state State
+		name  string
+	}{
+		{state: SourceSelect, name: "Source"},
+		{state: AtlasTypeSelect, name: "Type"},
+		{state: IdInput, name: "IDs"},
+		{state: MiscOptions, name: "Options"},
+		{state: Confirm, name: "Parse"},
+		{state: Results, name: "Results"},
 	}
+
+	var sb strings.Builder
 	sb.WriteString(m.theme.renderPaneTitle("Steps"))
 	paneWidth, _ := calculateViewportWidths(m.terminalWidth)
 
-	for i, step := range steps {
-		prefix := "◌ "
-		if State(i) == m.currentState {
-			prefix = "◉ "
+	for _, step := range steps {
+		if step.state == Results && len(m.results) == 0 {
+			continue
 		}
 
-		if State(i) == m.currentState {
-			sb.WriteString(m.theme.renderSelected(prefix + truncateText(step, paneWidth)))
+		if step.state == m.currentState {
+			sb.WriteString(m.theme.renderSelected(selectedPrefix + truncateText(step.name, paneWidth)))
 		} else {
-			sb.WriteString(m.theme.renderInactiveState(prefix + truncateText(step, paneWidth)))
+			sb.WriteString(m.theme.renderInactiveState(prefix + truncateText(step.name, paneWidth)))
 		}
 		sb.WriteString("\n")
 	}
@@ -75,23 +90,26 @@ func (m Model) optionsPaneContent() string {
 }
 
 func (m Model) sourceSelectContent() string {
-	var sb strings.Builder
+	options := []struct {
+		title       string
+		description string
+		source      Source
+	}{
+		{title: "Atlas", description: "Parse from scripts fetched from Atlas DB", source: atlas},
+		{title: "Local", description: "Parse from local files on your computer", source: local},
+	}
 
+	var sb strings.Builder
 	sb.WriteString(lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("Source"))
 	sb.WriteString("\n")
 	sb.WriteString(m.theme.renderNormalText("The source from which to fetch scripts.\nBoth options accept a list of scripts to parse.\nNote that parsing from Atlas requires an internet connection."))
 	sb.WriteString("\n\n")
 
-	for _, o := range sourceOptions {
-		prefix := "◌ "
-		if m.selectedSource == o.value {
-			prefix = "◉ "
-		}
-
-		if m.selectedSource == o.value {
-			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderSelected(o.Title), m.theme.renderDescription(o.Description)))
+	for _, o := range options {
+		if m.selectedSource == o.source {
+			sb.WriteString(fmt.Sprintf(selectedPrefix+"%s\n%s\n", m.theme.renderSelected(o.title), m.theme.renderDescription(o.description)))
 		} else {
-			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderNormalText(o.Title), m.theme.renderDescription(o.Description)))
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderNormalText(o.title), m.theme.renderDescription(o.description)))
 		}
 		sb.WriteString("\n")
 	}
@@ -100,23 +118,27 @@ func (m Model) sourceSelectContent() string {
 }
 
 func (m Model) atlasIdTypeSelectContent() string {
-	var sb strings.Builder
+	options := []struct {
+		title       string
+		description string
+		atlasType   AtlasIdType
+	}{
+		{title: "War", description: "Parse every script in a war (story chapter or event).\nEx: 100 for Fuyuki", atlasType: war},
+		{title: "Quest", description: "Parse every script in a quest (war section or interlude etc).\nEx: 1000001 for Fuyuki chapter 1", atlasType: quest},
+		{title: "Script", description: "Parse a list of specific scripts.\nEx: 0100000111 for Fuyuki chapter 1 post battle scene", atlasType: script},
+	}
 
+	var sb strings.Builder
 	sb.WriteString(lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("Type"))
 	sb.WriteString("\n")
 	sb.WriteString(m.theme.renderNormalText("The type of Atlas ID to input.\nIt's currently not possible to parse multiple types at once."))
 	sb.WriteString("\n\n")
 
-	for _, o := range atlasIdTypeOptions {
-		prefix := "◌ "
-		if m.selectedAtlasIdType == o.value {
-			prefix = "◉ "
-		}
-
-		if m.selectedAtlasIdType == o.value {
-			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderSelected(o.Title), m.theme.renderDescription(o.Description)))
+	for _, o := range options {
+		if m.selectedAtlasIdType == o.atlasType {
+			sb.WriteString(fmt.Sprintf(selectedPrefix+"%s\n%s\n", m.theme.renderSelected(o.title), m.theme.renderDescription(o.description)))
 		} else {
-			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderNormalText(o.Title), m.theme.renderDescription(o.Description)))
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderNormalText(o.title), m.theme.renderDescription(o.description)))
 		}
 		sb.WriteString("\n")
 	}
@@ -132,32 +154,39 @@ func (m Model) idInputContent() string {
 	)
 }
 
-// TODO: Clean this up like the above
 func (m Model) miscOptionsContent() string {
-	var sb strings.Builder
+	options := []struct {
+		title       string
+		description string
+		option      OptionsEnum
+	}{
+		{title: "No output file", description: "Print results only to the terminal.\n If unchecked, also outputs results to script-length.csv.", option: NoFile},
+		{title: "Include word count", description: "Calculates the approximate English word count per result.\nEnglish word count is conventionally half the character count.", option: IncludeWordCount},
+	}
 
+	var sb strings.Builder
 	sb.WriteString(lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("Options"))
 	sb.WriteString("\n")
 	sb.WriteString(m.theme.renderNormalText("Miscellaneous options for parsing."))
 	sb.WriteString("\n\n")
 
-	for _, o := range miscOptions {
-		prefix := "☐ "
-		switch o.value {
+	for _, o := range options {
+		prefix := checkbox
+		switch o.option {
 		case NoFile:
 			if m.options.noFile {
-				prefix = "☑  "
+				prefix = selectedCheckbox
 			}
 		case IncludeWordCount:
 			if m.options.includeWordCount {
-				prefix = "☑  "
+				prefix = selectedCheckbox
 			}
 		}
 
-		if m.currentOption == o.value {
-			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderSelected(o.Title), m.theme.renderDescription(o.Description)))
+		if m.currentOption == o.option {
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderSelected(o.title), m.theme.renderDescription(o.description)))
 		} else {
-			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderNormalText(o.Title), m.theme.renderDescription(o.Description)))
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderNormalText(o.title), m.theme.renderDescription(o.description)))
 		}
 		sb.WriteString("\n")
 	}
@@ -167,7 +196,6 @@ func (m Model) miscOptionsContent() string {
 
 func (m Model) parseContent() string {
 	var sb strings.Builder
-
 	if m.currentState == Confirm {
 		button := lipgloss.NewStyle().Background(m.theme.BorderColor).Foreground(m.theme.White).Padding(0, 2).Render("Parse")
 		sb.WriteString(button)
@@ -230,10 +258,31 @@ func (m Model) footerView() string {
 }
 
 func (m Model) idInputDescriptionView() string {
+	var sb strings.Builder
+	switch m.selectedSource {
+	case atlas:
+		switch m.selectedAtlasIdType {
+		case war:
+			sb.WriteString("Enter the war IDs to parse from.")
+		case quest:
+			sb.WriteString("Enter the quest IDs to parse from.")
+		case script:
+			sb.WriteString("Enter the script IDs to parse from.")
+		}
+		sb.WriteString("\n")
+		sb.WriteString("Only one ID per line.")
+	case local:
+		sb.WriteString("Enter the filepaths to local files to parse from.")
+		sb.WriteString("\n")
+		sb.WriteString("Only one filepath per line.")
+		sb.WriteString("\n")
+		sb.WriteString("Note that filepaths must be absolute.")
+	}
+
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("IDs"),
-		m.theme.renderNormalText("Enter the IDs (if Atlas) or filepaths (if local) to parse from.\nOne ID/filepath per line.\nNote that filepaths cannot be relative."),
+		m.theme.renderNormalText(sb.String()),
 		"\n",
 	)
 }

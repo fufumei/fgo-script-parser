@@ -16,6 +16,7 @@ type Source int
 const (
 	atlas Source = iota
 	local
+	SourceMaxCount int = iota
 )
 
 type AtlasIdType int
@@ -24,6 +25,7 @@ const (
 	war AtlasIdType = iota
 	quest
 	script
+	AtlasIdTypeMaxCount int = iota
 )
 
 type Options struct {
@@ -38,6 +40,7 @@ type OptionsEnum int
 const (
 	NoFile OptionsEnum = iota
 	IncludeWordCount
+	OptionsMaxCount int = iota
 )
 
 type State int

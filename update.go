@@ -154,17 +154,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keymap.NextOption):
 			switch m.currentState {
 			case SourceSelect:
-				if m.selectedSource == atlas {
-					m.selectedSource = local
-				} else {
-					m.selectedSource = atlas
+				if int(m.selectedSource) < SourceMaxCount-1 {
+					m.selectedSource = m.selectedSource + 1
 				}
 			case AtlasTypeSelect:
-				if int(m.selectedAtlasIdType) < len(atlasIdTypeOptions)-1 {
+				if int(m.selectedAtlasIdType) < AtlasIdTypeMaxCount-1 {
 					m.selectedAtlasIdType = m.selectedAtlasIdType + 1
 				}
 			case MiscOptions:
-				if int(m.currentOption) < len(miscOptions)-1 {
+				if int(m.currentOption) < OptionsMaxCount-1 {
 					m.currentOption = m.currentOption + 1
 				}
 			}
@@ -172,10 +170,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keymap.PrevOption):
 			switch m.currentState {
 			case SourceSelect:
-				if m.selectedSource == atlas {
-					m.selectedSource = local
-				} else {
-					m.selectedSource = atlas
+				if int(m.selectedSource) > 0 {
+					m.selectedSource = m.selectedSource - 1
 				}
 			case AtlasTypeSelect:
 				if int(m.selectedAtlasIdType) > 0 {
