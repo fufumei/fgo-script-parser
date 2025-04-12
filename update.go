@@ -201,6 +201,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateKeymap()
 			return m, nil // Prevent new line from double enter input
 
+		case key.Matches(msg, m.keymap.ClearInput):
+			m.IdInput.Reset()
+			m.IdInput.Focus()
+			m.IdInput.CursorEnd()
+			m.updateKeymap()
+
 		case key.Matches(msg, m.keymap.Copy):
 			cmds = append(cmds, m.copyToClipboard)
 
