@@ -2,151 +2,236 @@ package main
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
 
-	"github.com/alecthomas/kong"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-zoox/fetch"
 	"golang.org/x/exp/slices"
 )
 
-var CLI struct {
-	NoFile bool `name:"no-file" default:"false" help:"If true, print the result directly to the terminal, otherwise outputs to a csv on the same level as the script."`
-
-	Atlas struct {
-		War    string `required short:"w" xor:"type" help:"A war ID to query against Atlas."`
-		Quest  string `required short:"q" xor:"type" help:"A quest ID to query against Atlas."`
-		Script string `required short:"s" xor:"type" help:"A script ID to query against Atlas."`
-	} `cmd:"" help:"Fetches scripts from Atlas API to parse."`
-	Local struct {
-		IgnoreSplits bool `name:"ignore-splits" default:"false" hidden:""`
-
-		Path string `arg:"" name:"path" type:"path"`
-	} `cmd:"" help:"Parses locally stored scripts."`
+type ParseResult struct {
+	id    string
+	name  string
+	count Count
 }
 
-func main() {
-	ctx := kong.Parse(&CLI)
-	switch ctx.Command() {
-	case "atlas":
-		ParseFromAtlas()
-	case "local <path>":
-		ParseFromLocal()
-	default:
-		panic(ctx.Command())
+type parseSuccessMsg []ParseResult
+
+type parseFailureMsg error
+
+type Script struct {
+	ScriptId string `json:"scriptId"`
+	Script   string `json:"script"`
+}
+
+type Quest struct {
+	Name         string `json:"name"`
+	Id           int    `json:"id"`
+	Type         string `json:"type"`
+	PhaseScripts []struct {
+		Phase   int `json:"phase"`
+		Scripts []Script
 	}
 }
 
-func ParseFromAtlas() {
-	var writer *csv.Writer
-	if !CLI.NoFile {
-		file := CreateFile()
-		writer = csv.NewWriter(file)
-	} else {
-		writer = csv.NewWriter(os.Stdout)
+type Response struct {
+	Name     string `json:"name"`
+	LongName string `json:"longName"`
+	Spots    []struct {
+		Quests []Quest
 	}
-	writer.Comma = '\t'
-	writer.Write([]string{"Name", "Lines", "Characters"})
+}
+
+type Count struct {
+	lines      int
+	characters int
+}
+
+func (m Model) parseScriptCmd() tea.Cmd {
+	return func() tea.Msg {
+		var results []ParseResult
+		var err error
+		if strings.TrimSpace(m.IdInput.Value()) == "" {
+			return parseFailureMsg(errors.New("IDs cannot be empty"))
+		}
+
+		switch m.selectedSource {
+		case atlas:
+			results, err = m.ParseFromAtlas()
+		case local:
+			results, err = m.ParseFromLocal()
+		}
+		if err != nil {
+			return parseFailureMsg(err)
+		}
+
+		var writer *csv.Writer
+		if !m.options.noFile {
+			file, err := CreateFile()
+			if err != nil {
+				return parseFailureMsg(err)
+			}
+			writer = csv.NewWriter(file)
+		} else {
+			writer = csv.NewWriter(os.Stdout)
+		}
+		writer.Comma = '\t'
+
+		// TODO: Don't include ID for local parsing
+		if m.options.includeWordCount {
+			writer.Write([]string{"Id", "Name", "Lines", "Characters, Words"})
+			for _, r := range results {
+				writer.Write([]string{r.id, r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)})
+			}
+		} else {
+			writer.Write([]string{"Id", "Name", "Lines", "Characters"})
+			for _, r := range results {
+				writer.Write([]string{r.id, r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters), fmt.Sprint(r.count.characters / 2)})
+			}
+		}
+
+		if !m.options.noFile {
+			writer.Flush()
+		}
+		return parseSuccessMsg(results)
+	}
+}
+
+func (m Model) ParseFromAtlas() ([]ParseResult, error) {
+	var results []ParseResult
 
 	scripts := make(map[string]Script)
-	var name string
-	if CLI.Atlas.War != "" {
-		s, n := FetchWarScripts(CLI.Atlas.War)
-		name = n
-		for _, script := range s {
-			scripts[script.ScriptId] = script
+	for id := range strings.SplitSeq(m.IdInput.Value(), "\n") {
+		// Skip empty rows
+		if strings.Trim(id, " ") == "" {
+			continue
 		}
-		// The quest list for OC2 does not include the appendix
-		if CLI.Atlas.War == "403" {
-			s = FetchQuestScripts("4000327")
+
+		switch m.selectedAtlasIdType {
+		case war:
+			s, name, err := FetchWarScripts(id)
+			if err != nil {
+				return nil, err
+			}
 			for _, script := range s {
 				scripts[script.ScriptId] = script
 			}
+			// The quest list for OC2 does not include the appendix
+			if id == "403" {
+				s, _, err = FetchQuestScripts("4000327")
+				if err != nil {
+					return nil, err
+				}
+				for _, script := range s {
+					scripts[script.ScriptId] = script
+				}
+			}
+
+			var scr []Script
+			for _, v := range scripts {
+				scr = append(scr, v)
+			}
+			result, err := ParseScripts(scr, name)
+			if err != nil {
+				return nil, err
+			}
+			result.id = id
+			results = append(results, result)
+		case quest:
+			s, name, err := FetchQuestScripts(id)
+			if err != nil {
+				return nil, err
+			}
+			for _, script := range s {
+				scripts[script.ScriptId] = script
+			}
+
+			var scr []Script
+			for _, v := range scripts {
+				scr = append(scr, v)
+			}
+			result, err := ParseScripts(scr, name)
+			if err != nil {
+				return nil, err
+			}
+			result.id = id
+			results = append(results, result)
+		case script:
+			result, err := FetchSingleScript(id)
+			if err != nil {
+				return nil, err
+			}
+			result.id = id
+			results = append(results, result)
 		}
-	} else if CLI.Atlas.Quest != "" {
-		s := FetchQuestScripts(CLI.Atlas.Quest)
-		for _, script := range s {
-			scripts[script.ScriptId] = script
-		}
-		name = CLI.Atlas.Quest
-	} else if CLI.Atlas.Script != "" {
-		FetchScript(CLI.Atlas.Script, writer)
-		writer.Flush()
-		return
 	}
 
-	var scr []Script
-	for _, v := range scripts {
-		scr = append(scr, v)
-	}
-	ParseScripts(scr, name, writer)
-	writer.Flush()
+	return results, nil
 }
 
-func ParseFromLocal() {
-	var writer *csv.Writer
-	if !CLI.NoFile {
-		file := CreateFile()
-		writer = csv.NewWriter(file)
-	} else {
-		writer = csv.NewWriter(os.Stdout)
-	}
-	writer.Comma = '\t'
-	writer.Write([]string{"Name", "Lines", "Characters"})
+func (m Model) ParseFromLocal() ([]ParseResult, error) {
+	var results []ParseResult
 
-	argInfo, err := os.Stat(CLI.Local.Path)
-	if err != nil {
-		log.Fatalf("Could not get file info for %s.", CLI.Local.Path)
-	}
-
-	// If given path is a file, just open and count it, else traverse the directory
-	if argInfo.IsDir() {
-		TraverseDirectories(CLI.Local.Path, writer)
-		writer.Flush()
-	} else {
-		data, err := os.ReadFile(CLI.Local.Path)
+	for path := range strings.SplitSeq(m.IdInput.Value(), "\n") {
+		// Get rid of empty rows
+		if strings.Trim(path, " ") == "" {
+			continue
+		}
+		path = strings.Trim(path, "\"")
+		argInfo, err := os.Stat(path)
 		if err != nil {
-			log.Fatalf("Can't read file: %s", CLI.Local.Path)
+			return nil, parseFailureMsg(fmt.Errorf("could not get file info for %s. %s", path, err))
 		}
-		lines, characters := CleanAndCountScript(string(data))
-		fmt.Printf("%s\t%d\t%d", strings.TrimSuffix(filepath.Base(CLI.Local.Path), filepath.Ext(CLI.Local.Path)), lines, characters)
+
+		// If given path is a file, just open and count it, else traverse the directory
+		if argInfo.IsDir() {
+			TraverseDirectories(path, &results)
+		} else {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return nil, parseFailureMsg(fmt.Errorf("can't read file: %s. %s", path, err))
+			}
+			count := CleanAndCountScript(string(data))
+			results = append(results, ParseResult{
+				name:  strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
+				count: count,
+			})
+		}
 	}
+
+	return results, nil
 }
 
-func CreateFile() *os.File {
+func CreateFile() (*os.File, error) {
 	file, err := os.Create("script-length.csv")
 	if err != nil {
-		log.Fatalf("Could not create output file. %s", err)
+		return nil, parseFailureMsg(fmt.Errorf("could not create output file. %s", err))
 	}
-	return file
+	return file, nil
 }
 
-func ParseScripts(scripts []Script, name string, writer *csv.Writer) {
+func ParseScripts(scripts []Script, name string) (ParseResult, error) {
 	lines := 0
 	characters := 0
 	ch := make(chan Count, len(scripts))
 	wg := sync.WaitGroup{}
 	for _, script := range scripts {
 		wg.Add(1)
-
 		go func(script Script) {
-			r, err := fetch.Get(script.Script)
-			if err != nil {
-				log.Fatalf("Error fetching script " + script.ScriptId)
-				return
-			}
-			l, c := CleanAndCountScript(r.String())
-			ch <- Count{l, c}
+			// TODO: Handle error
+			r, _ := fetch.Get(script.Script)
+			count := CleanAndCountScript(r.String())
+			ch <- count
 			wg.Done()
 		}(script)
 	}
-
 	wg.Wait()
 	close(ch)
 
@@ -155,18 +240,26 @@ func ParseScripts(scripts []Script, name string, writer *csv.Writer) {
 		characters += c.characters
 	}
 
-	writer.Write([]string{name, fmt.Sprint(lines), fmt.Sprint(characters)})
+	return ParseResult{
+		name: name,
+		count: Count{
+			lines:      lines,
+			characters: characters,
+		},
+	}, nil
 }
 
-func FetchWarScripts(id string) ([]Script, string) {
+func FetchWarScripts(id string) ([]Script, string, error) {
 	var result Response
 	response, err := fetch.Get(fmt.Sprintf("https://api.atlasacademy.io/nice/JP/war/%s?lang=en", id))
-	if err != nil {
-		log.Fatalf("Could not get data for war with ID %s", id)
+	if response.StatusCode() == 404 {
+		return nil, "", parseFailureMsg(fmt.Errorf("could not get data for war with ID %s. Make sure the ID is correct", id))
+	} else if err != nil {
+		return nil, "", parseFailureMsg(fmt.Errorf("could not get data for war with ID %s. %s", id, err))
 	}
 	err = response.UnmarshalJSON(&result)
 	if err != nil {
-		log.Fatal("Error unmarshaling JSON:", err)
+		return nil, "", parseFailureMsg(fmt.Errorf("error unmarshaling JSON: %s", err))
 	}
 
 	var scripts []Script
@@ -180,18 +273,25 @@ func FetchWarScripts(id string) ([]Script, string) {
 			}
 		}
 	}
-	return scripts, result.Name
+	// TODO: Might be needed for the other fetching functions as well
+	name := result.Name
+	if result.Name == "-" {
+		name = result.LongName
+	}
+	return scripts, name, nil
 }
 
-func FetchQuestScripts(id string) []Script {
+func FetchQuestScripts(id string) ([]Script, string, error) {
 	var result Quest
 	response, err := fetch.Get(fmt.Sprintf("https://api.atlasacademy.io/nice/JP/quest/%s?lang=en", id))
-	if err != nil {
-		log.Fatalf("Could not get data for quest with ID %s", id)
+	if response.StatusCode() == 404 {
+		return nil, "", parseFailureMsg(fmt.Errorf("could not get data for quest with ID %s. Make sure the ID is correct", id))
+	} else if err != nil {
+		return nil, "", parseFailureMsg(fmt.Errorf("could not get data for quest with ID %s. %s", id, err))
 	}
 	err = response.UnmarshalJSON(&result)
 	if err != nil {
-		log.Fatal("Error unmarshaling JSON:", err)
+		return nil, "", parseFailureMsg(fmt.Errorf("error unmarshaling JSON: %s", err))
 	}
 
 	var scripts []Script
@@ -199,23 +299,28 @@ func FetchQuestScripts(id string) []Script {
 		scripts = append(scripts, phase.Scripts...)
 	}
 
-	return scripts
+	return scripts, result.Name, nil
 }
 
-func FetchScript(id string, writer *csv.Writer) {
-	r, err := fetch.Get(fmt.Sprintf("https://static.atlasacademy.io/JP/Script/%s/%s.txt", id[0:2], id))
-	if err != nil {
-		log.Fatalf("Error fetching script " + id)
-		return
+func FetchSingleScript(id string) (ParseResult, error) {
+	response, err := fetch.Get(fmt.Sprintf("https://static.atlasacademy.io/JP/Script/%s/%s.txt", id[0:2], id))
+	if response.StatusCode() == 404 {
+		return ParseResult{}, parseFailureMsg(fmt.Errorf("error fetching script %s. Make sure the ID is correct", id))
+	} else if err != nil {
+		return ParseResult{}, parseFailureMsg(fmt.Errorf("error fetching script %s. %s", id, err))
 	}
-	l, c := CleanAndCountScript(r.String())
-	writer.Write([]string{id, fmt.Sprint(l), fmt.Sprint(c)})
+	count := CleanAndCountScript(response.String())
+
+	return ParseResult{
+		name:  id,
+		count: count,
+	}, nil
 }
 
-func TraverseDirectories(path string, writer *csv.Writer) {
+func TraverseDirectories(path string, results *[]ParseResult) error {
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		fmt.Println("Unable to get entries for directory ", path)
+		return parseFailureMsg(fmt.Errorf("unable to get entries for directory %s", path))
 	}
 
 	hasDirectory := slices.ContainsFunc(entries, func(e fs.DirEntry) bool {
@@ -225,27 +330,38 @@ func TraverseDirectories(path string, writer *csv.Writer) {
 	// If directories exist, call this recursively for each one until we hit the lowest level
 	if hasDirectory {
 		for _, e := range entries {
-			TraverseDirectories(filepath.Join(path, e.Name()), writer)
+			err = TraverseDirectories(filepath.Join(path, e.Name()), results)
+			if err != nil {
+				break
+			}
 		}
-		return
+		return err
 	}
 
 	lines := 0
 	characters := 0
-	// TODO: This could be done with goroutines but it's pretty fast already
+	// This could be done with goroutines but it's pretty fast already
 	for _, e := range entries {
 		data, err := os.ReadFile(filepath.Join(path, e.Name()))
 		if err != nil {
-			log.Fatalf("Can't read file: %s", filepath.Join(path, e.Name()))
+			return parseFailureMsg(fmt.Errorf("can't read file: %s", filepath.Join(path, e.Name())))
 		}
-		l, c := CleanAndCountScript(string(data))
-		lines += l
-		characters += c
+		count := CleanAndCountScript(string(data))
+		lines += count.lines
+		characters += count.characters
 	}
-	writer.Write([]string{filepath.Base(path), fmt.Sprint(lines), fmt.Sprint(characters)})
+	*results = append(*results, ParseResult{
+		name: filepath.Base(path),
+		count: Count{
+			lines:      lines,
+			characters: characters,
+		},
+	})
+
+	return nil
 }
 
-func CleanAndCountScript(data string) (int, int) {
+func CleanAndCountScript(data string) Count {
 	r, _ := regexp.Compile(`(＠([A-Z][：:])?(.*)\n)(.*?\n(?:.*?\n)?)?(.*?)\n\[k\]|(？.+?：.+)`)
 	matches := r.FindAllString(data, -1)
 	lines := len(matches)
@@ -255,5 +371,8 @@ func CleanAndCountScript(data string) (int, int) {
 		characters += len([]rune(r.ReplaceAllString(m, "")))
 	}
 
-	return lines, characters
+	return Count{
+		lines:      lines,
+		characters: characters,
+	}
 }
