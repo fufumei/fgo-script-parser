@@ -20,20 +20,20 @@ func clearErrAfter(d time.Duration) tea.Cmd {
 	})
 }
 
-func clearNotifAfter(d time.Duration) tea.Cmd {
-	return tea.Tick(d, func(t time.Time) tea.Msg {
-		return clipboardMsg{}
-	})
+type notificationMsg struct {
+	message string
 }
 
-type clipboardMsg struct {
-	message string
+func clearNotifAfter(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(t time.Time) tea.Msg {
+		return notificationMsg{}
+	})
 }
 
 func (m Model) copyToClipboard() tea.Msg {
 	row := m.resultsTable.SelectedRow()
 	clipboard.Write(clipboard.FmtText, fmt.Appendf(nil, "%s, %s, %s", row[0], row[1], row[2]))
-	return clipboardMsg{message: "Row copied to clipboard!"}
+	return notificationMsg{message: "Row copied to clipboard!"}
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -42,8 +42,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case parseSuccessMsg:
-		m.results = msg
-
 		_, w2 := calculateViewportWidths(m.terminalWidth)
 		var columns []table.Column
 		var rows []table.Row
@@ -91,18 +89,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			table.WithKeyMap(keys),
 		)
 		m.resultsTable = t
+		m.results = msg
 		m.currentState = Results
-		m.resultsTable.Focus()
+		cmds = append(cmds, m.timer.Stop(), m.timer.Reset())
 	case parseFailureMsg:
 		m.err = msg
 		m.currentState = Confirm
-		cmds = append(cmds, tea.WindowSize(), clearErrAfter(10*time.Second))
+		cmds = append(cmds, tea.WindowSize(), clearErrAfter(5*time.Second), m.timer.Stop(), m.timer.Reset())
 	case clearErrMsg:
 		m.err = nil
 		cmds = append(cmds, tea.WindowSize())
-	case clipboardMsg:
+	case notificationMsg:
 		m.notification = msg
-		cmds = append(cmds, tea.WindowSize(), clearNotifAfter(3*time.Second))
+		cmds = append(cmds, tea.WindowSize(), clearNotifAfter(2*time.Second))
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.NextState):
@@ -208,8 +207,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = nil
 			return m, tea.Batch(
 				m.loadingSpinner.Tick,
-				// TODO: This is buggy sometimes, only showing 0
-				m.timer.Reset(),
 				m.timer.Start(),
 				m.parseScriptCmd(),
 			)
@@ -219,7 +216,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.abort = true
 			return m, tea.Quit
 		}
-
 	case tea.WindowSizeMsg:
 		headerHeight := lipgloss.Height(m.headerView())
 		footerHeight := lipgloss.Height(m.footerView())

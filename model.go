@@ -56,28 +56,28 @@ const (
 )
 
 type Model struct {
-	ready                         bool
-	terminalWidth, terminalHeight int
-
-	theme                  Theme
-	statePane, optionsPane viewport.Model
-	IdInput                textarea.Model
-	help                   help.Model
-	keymap                 KeyMap
-	loadingSpinner         spinner.Model
-	timer                  stopwatch.Model
-	resultsTable           table.Model
-
 	currentOption       OptionsEnum
 	currentState        State
 	selectedSource      Source
 	selectedAtlasIdType AtlasIdType
 	options             Options
 	results             []ParseResult
-	quitting            bool
-	abort               bool
-	err                 error
-	notification        clipboardMsg
+	notification        notificationMsg
+
+	theme                  Theme
+	help                   help.Model
+	keymap                 KeyMap
+	statePane, optionsPane viewport.Model
+	IdInput                textarea.Model
+	loadingSpinner         spinner.Model
+	timer                  stopwatch.Model
+	resultsTable           table.Model
+
+	ready                         bool
+	terminalWidth, terminalHeight int
+	quitting                      bool
+	abort                         bool
+	err                           error
 }
 
 func NewModel() Model {
