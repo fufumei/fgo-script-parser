@@ -235,7 +235,7 @@ func (m Model) footerView() string {
 
 	notif := ""
 	if m.err != nil {
-		notif = m.theme.renderError(m.err.Error())
+		notif = m.theme.renderError(strings.ToUpper(m.err.Error()[:1]) + m.err.Error()[1:])
 		return footerStyle.Render(
 			lipgloss.JoinVertical(
 				lipgloss.Left,

@@ -48,22 +48,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if m.options.includeWordCount {
 			columns = []table.Column{
-				{Title: "Name", Width: int((float64(w2)) * 0.4)},
+				{Title: "Id", Width: int((float64(w2)) * 0.1)},
+				{Title: "Name", Width: int((float64(w2)) * 0.3)},
 				{Title: "Lines", Width: int((float64(w2)) * 0.2)},
 				{Title: "Characters", Width: int((float64(w2)) * 0.2)},
 				{Title: "Words", Width: int((float64(w2)) * 0.2)},
 			}
 			for _, r := range msg {
-				rows = append(rows, table.Row{r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters), fmt.Sprint(r.count.characters / 2)})
+				rows = append(rows, table.Row{r.id, r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters), fmt.Sprint(r.count.characters / 2)})
 			}
 		} else {
 			columns = []table.Column{
-				{Title: "Name", Width: int((float64(w2)) * 0.5)},
+				{Title: "Id", Width: int((float64(w2)) * 0.1)},
+				{Title: "Name", Width: int((float64(w2)) * 0.4)},
 				{Title: "Lines", Width: int((float64(w2)) * 0.25)},
 				{Title: "Characters", Width: int((float64(w2)) * 0.25)},
 			}
 			for _, r := range msg {
-				rows = append(rows, table.Row{r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)})
+				rows = append(rows, table.Row{r.id, r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)})
 			}
 		}
 
