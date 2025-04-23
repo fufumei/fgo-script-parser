@@ -12,8 +12,8 @@ You can use this program to either fetch scripts from Atlas, or parse files stor
 By default the result will output to `script-length.csv` in the same location as the script as well as print a table to the TUI. If the `No File` option is enabled, the result will only print to the TUI.
 
 Regardless of output destination, the format is a tab-separated list with the format:  
-`id    name    total lines    total characters`.  
-A column for calculating the approximate English word count can be optionally added.
+`id    name    total lines    total characters  (words)`.  
+The column for calculating the approximate English word count can be optionally added.
 
 When parsing local files, it is possible to parse either entire directories, or individual files (in which case the file extension must be included. FGO story scripts are in `.txt` format by default).  
 If the given path is a directory, the script will traverse every underlying path until it finds a file to open. It will then count the total lines and characters in the current directory, write the result to the output, and repeat for any remaining folders.  
