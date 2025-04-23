@@ -36,6 +36,25 @@ func (m Model) copyToClipboard() tea.Msg {
 	return notificationMsg{message: "Row copied to clipboard!"}
 }
 
+func getTableColumns(totalWidth int, includeWordCount bool) []table.Column {
+	if includeWordCount {
+		return []table.Column{
+			{Title: "Id", Width: int((float64(totalWidth)) * 0.1)},
+			{Title: "Name", Width: int((float64(totalWidth)) * 0.4)},
+			{Title: "Lines", Width: int((float64(totalWidth)) * 0.1)},
+			{Title: "Characters", Width: int((float64(totalWidth)) * 0.15)},
+			{Title: "Words", Width: int((float64(totalWidth)) * 0.25)},
+		}
+	} else {
+		return []table.Column{
+			{Title: "Id", Width: int((float64(totalWidth)) * 0.1)},
+			{Title: "Name", Width: int((float64(totalWidth)) * 0.5)},
+			{Title: "Lines", Width: int((float64(totalWidth)) * 0.15)},
+			{Title: "Characters", Width: int((float64(totalWidth)) * 0.25)},
+		}
+	}
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
@@ -46,24 +65,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var columns []table.Column
 		var rows []table.Row
 
+		columns = getTableColumns(w2, m.options.includeWordCount)
+
 		if m.options.includeWordCount {
-			columns = []table.Column{
-				{Title: "Id", Width: int((float64(w2)) * 0.1)},
-				{Title: "Name", Width: int((float64(w2)) * 0.3)},
-				{Title: "Lines", Width: int((float64(w2)) * 0.2)},
-				{Title: "Characters", Width: int((float64(w2)) * 0.2)},
-				{Title: "Words", Width: int((float64(w2)) * 0.2)},
-			}
 			for _, r := range msg {
 				rows = append(rows, table.Row{r.id, r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters), fmt.Sprint(r.count.characters / 2)})
 			}
 		} else {
-			columns = []table.Column{
-				{Title: "Id", Width: int((float64(w2)) * 0.1)},
-				{Title: "Name", Width: int((float64(w2)) * 0.4)},
-				{Title: "Lines", Width: int((float64(w2)) * 0.25)},
-				{Title: "Characters", Width: int((float64(w2)) * 0.25)},
-			}
 			for _, r := range msg {
 				rows = append(rows, table.Row{r.id, r.name, fmt.Sprint(r.count.lines), fmt.Sprint(r.count.characters)})
 			}
@@ -250,7 +258,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.optionsPane.SetContent(m.optionsPaneContent())
 
 			m.IdInput.SetHeight(msg.Height - verticalMarginHeight - idInputDscriptionHeight)
-			m.IdInput.SetWidth(w2)
+			m.IdInput.SetWidth(w2 - 5) // FIXME: Magic number
 			m.IdInput.FocusedStyle.CursorLine = lipgloss.NewStyle().Foreground(m.theme.SecondaryColor)
 
 			m.loadingSpinner.Style = lipgloss.NewStyle().Foreground(m.theme.SecondaryColor)
@@ -265,13 +273,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.optionsPane.Height = msg.Height - verticalMarginHeight
 
 			m.IdInput.SetHeight(msg.Height - verticalMarginHeight - idInputDscriptionHeight)
-			m.IdInput.SetWidth(w2)
+			m.IdInput.SetWidth(w2 - 5) // FIXME: Magic number
 
-			m.resultsTable.SetColumns([]table.Column{
-				{Title: "Name", Width: int((float64(w2)) * 0.5)},
-				{Title: "Lines", Width: int((float64(w2)) * 0.25)},
-				{Title: "Characters", Width: int((float64(w2)) * 0.25)},
-			})
+			m.resultsTable.SetColumns(getTableColumns(w2, m.options.includeWordCount))
 		}
 	}
 
