@@ -1,6 +1,7 @@
 # Test stuff
 /scripts
 *.csv
+*.zip
 
 # Binaries for programs and plugins
 *.exe
