@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -87,8 +88,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		footerHeight := lipgloss.Height(m.footerView())
 		verticalMarginHeight := headerHeight + footerHeight
 		styles := table.DefaultStyles()
-		styles.Header = styles.Header.Foreground(m.theme.TertiaryColor)
-		styles.Selected = styles.Selected.Foreground(m.theme.SecondaryColor)
+		styles.Header = m.theme.Table.Header
+		styles.Selected = m.theme.Table.Selected
 
 		keys := table.KeyMap{
 			LineUp:   key.NewBinding(key.WithKeys("up")),
@@ -262,22 +263,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// we can initialize the viewport. The initial dimensions come in
 			// quickly, though asynchronously, which is why we wait for them
 			// here.
+			m.theme = DefaultTheme(m.terminalWidth)
+
 			m.statePane = viewport.New(w1, msg.Height-verticalMarginHeight)
-			m.statePane.Style = m.theme.paneStyle(0)
+			m.statePane.Style = m.theme.Interface.StatePane
 			m.statePane.YPosition = headerHeight
 			m.statePane.SetContent(m.statePaneContent())
 
 			m.optionsPane = viewport.New(w2, msg.Height-verticalMarginHeight)
-			m.optionsPane.Style = m.theme.paneStyle(1)
+			m.optionsPane.Style = m.theme.Interface.OptionsPane
 			m.optionsPane.YPosition = headerHeight
 			m.optionsPane.SetContent(m.optionsPaneContent())
 
 			m.IdInput.SetHeight(msg.Height - verticalMarginHeight - idInputDscriptionHeight)
 			m.IdInput.SetWidth(w2 - paneMargin)
-			m.IdInput.FocusedStyle.CursorLine = lipgloss.NewStyle().Foreground(m.theme.SecondaryColor)
+			m.IdInput.FocusedStyle.CursorLine = m.theme.Text.Highlighted
 
-			m.loadingSpinner.Style = lipgloss.NewStyle().Foreground(m.theme.SecondaryColor)
-			m.loadingSpinner.Spinner = m.theme.SpinnerType
+			m.loadingSpinner.Style = m.theme.Text.Highlighted
+			m.loadingSpinner.Spinner = spinner.Line // TODO: Move to theme
 
 			m.ready = true
 		} else {

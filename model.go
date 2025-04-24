@@ -88,7 +88,6 @@ func NewModel() Model {
 	body.Prompt = ""
 
 	return Model{
-		theme:          DefaultTheme(),
 		IdInput:        body,
 		loadingSpinner: spinner.New(),
 		help:           help.New(),

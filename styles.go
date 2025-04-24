@@ -1,7 +1,8 @@
 package main
 
 import (
-	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-runewidth"
 )
@@ -9,98 +10,80 @@ import (
 const FooterHeight = 2
 
 type Theme struct {
-	BodyColor      lipgloss.Color
-	EmphasisColor  lipgloss.Color
-	BorderColor    lipgloss.Color
-	PrimaryColor   lipgloss.Color
-	SecondaryColor lipgloss.Color
-	TertiaryColor  lipgloss.Color
-	SuccessColor   lipgloss.Color
-	WarningColor   lipgloss.Color
-	ErrorColor     lipgloss.Color
-	InfoColor      lipgloss.Color
-	White          lipgloss.Color
-	Gray           lipgloss.Color
-	Black          lipgloss.Color
-	Gold           lipgloss.Color
-
-	SpinnerType spinner.Spinner
+	Interface InterfaceStyles
+	Text      TextStyles
+	Table     TableStyles
+	Help      help.Styles
 }
 
-func DefaultTheme() Theme {
-	return Theme{
-		BodyColor:      "#D3C6AA",
-		EmphasisColor:  "#E67E80",
-		BorderColor:    "#2C5CA4",
-		PrimaryColor:   "#D1E3FA",
-		SecondaryColor: "#0f81cf",
-		TertiaryColor:  "#9EDEFF",
-		SuccessColor:   "#8DA101",
-		WarningColor:   "#5C6A72",
-		InfoColor:      "#3A94C5",
-		ErrorColor:     "#F85552",
-		White:          "#DFDDC8",
-		Gray:           "#75828a",
-		Black:          "#343F44",
-		Gold:           "#f4cf0b",
-
-		SpinnerType: spinner.Line,
-	}
+// The styles for the interface wrapper
+type InterfaceStyles struct {
+	Title       lipgloss.Style
+	Border      lipgloss.Style
+	StatePane   lipgloss.Style
+	OptionsPane lipgloss.Style
+	Footer      lipgloss.Style
 }
 
-func (t Theme) paneStyle(pos int) lipgloss.Style {
-	if pos == 0 {
-		return lipgloss.NewStyle().Padding(0, 1).BorderStyle(lipgloss.NormalBorder()).BorderForeground(t.BorderColor).BorderRight(true)
-	} else {
-		return lipgloss.NewStyle().Padding(0, 0, 0, 3)
-	}
+type TextStyles struct {
+	StatePaneTitle    lipgloss.Style
+	OptionsPaneTitle  lipgloss.Style
+	Default           lipgloss.Style
+	Highlighted       lipgloss.Style
+	Darkened          lipgloss.Style
+	OptionDescription lipgloss.Style
+	Notification      lipgloss.Style
+	Error             lipgloss.Style
 }
 
-func (t Theme) renderHeader(s string) string {
+type TableStyles struct {
+	Header   lipgloss.Style
+	Selected lipgloss.Style
+}
+
+func DefaultTheme(terminalWidth int) Theme {
+	var t Theme
+
+	var (
+		gold      = lipgloss.Color("#f4cf0b")
+		border    = lipgloss.Color("#2C5CA4")
+		gray      = lipgloss.Color("#75828a")
+		white     = lipgloss.Color("#D1E3FA")
+		darkBlue  = lipgloss.Color("#0f81cf")
+		lightBlue = lipgloss.Color("#9EDEFF")
+		red       = lipgloss.Color("#F85552")
+		green     = lipgloss.Color("#8DA101")
+	)
+
+	// Interface styles
 	b := lipgloss.RoundedBorder()
 	b.Right = "├"
-	style := lipgloss.NewStyle().BorderStyle(b).BorderForeground(t.BorderColor).Foreground(t.Gold).Padding(0, 1)
-	return style.Render(s)
-}
+	t.Interface.Title = lipgloss.NewStyle().BorderStyle(b).BorderForeground(border).Foreground(gold).Padding(0, 1)
+	t.Interface.Border = lipgloss.NewStyle().Foreground(border)
+	t.Interface.StatePane = lipgloss.NewStyle().Padding(0, 1).BorderStyle(lipgloss.NormalBorder()).BorderForeground(border).BorderRight(true)
+	t.Interface.OptionsPane = lipgloss.NewStyle().Padding(0, 0, 0, 3)
+	t.Interface.Footer = lipgloss.NewStyle().Foreground(gray).Border(lipgloss.NormalBorder()).BorderTop(true).BorderBottom(false).
+		BorderLeft(false).BorderRight(false).BorderForeground(border).Height(FooterHeight - 1). // top border
+		Width(terminalWidth)
 
-func (t Theme) renderPaneTitle(s string) string {
-	style := lipgloss.NewStyle().Foreground(t.TertiaryColor).Padding(0, 1).Bold(true)
-	return style.Render(s) + "\n\n"
-}
+	// Text styles
+	t.Text.StatePaneTitle = lipgloss.NewStyle().Foreground(lightBlue).Padding(0, 1).Bold(true)
+	t.Text.OptionsPaneTitle = lipgloss.NewStyle().Foreground(lightBlue)
+	t.Text.Default = lipgloss.NewStyle().Foreground(white)
+	t.Text.Highlighted = lipgloss.NewStyle().Foreground(darkBlue)
+	t.Text.Darkened = lipgloss.NewStyle().Foreground(gray)
+	t.Text.OptionDescription = lipgloss.NewStyle().PaddingLeft(2).Foreground(gray)
+	t.Text.Notification = lipgloss.NewStyle().Foreground(green)
+	t.Text.Error = lipgloss.NewStyle().Foreground(red)
 
-func (t Theme) renderInactiveState(s string) string {
-	style := lipgloss.NewStyle().Foreground(t.Gray)
-	return style.Render(s)
-}
+	// Table styles
+	t.Table.Header = table.DefaultStyles().Header.Foreground(lightBlue)
+	t.Table.Selected = table.DefaultStyles().Selected.Foreground(darkBlue)
 
-func (t Theme) renderSelected(s string) string {
-	style := lipgloss.NewStyle().Foreground(t.SecondaryColor)
-	return style.Render(s)
-}
+	// Help styles
+	t.Help = help.New().Styles
 
-func (t Theme) renderDescription(s string) string {
-	style := lipgloss.NewStyle().PaddingLeft(2).Foreground(t.Gray)
-	return style.Render(s)
-}
-
-func (t Theme) renderDisabledDescription(s string) string {
-	style := lipgloss.NewStyle().PaddingLeft(2).Foreground(t.Gray)
-	return style.Render(s)
-}
-
-func (t Theme) renderNormalText(s string) string {
-	style := lipgloss.NewStyle().Foreground(t.PrimaryColor)
-	return style.Render(s)
-}
-
-func (t Theme) renderError(s string) string {
-	style := lipgloss.NewStyle().Foreground(t.ErrorColor)
-	return style.Render(s)
-}
-
-func (t Theme) renderNotification(s string) string {
-	style := lipgloss.NewStyle().Foreground(t.SuccessColor)
-	return style.Render(s)
+	return t
 }
 
 func truncateText(s string, w int) string {
