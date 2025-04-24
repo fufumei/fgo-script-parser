@@ -246,6 +246,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.terminalWidth = msg.Width
 		m.terminalHeight = msg.Height
 		w1, w2 := calculateViewportWidths(msg.Width)
+		paneMargin := 5 // Magic number
 
 		if !m.ready {
 			// Since this program is using the full size of the viewport we
@@ -264,7 +265,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.optionsPane.SetContent(m.optionsPaneContent())
 
 			m.IdInput.SetHeight(msg.Height - verticalMarginHeight - idInputDscriptionHeight)
-			m.IdInput.SetWidth(w2 - 5) // FIXME: Magic number
+			m.IdInput.SetWidth(w2 - paneMargin)
 			m.IdInput.FocusedStyle.CursorLine = lipgloss.NewStyle().Foreground(m.theme.SecondaryColor)
 
 			m.loadingSpinner.Style = lipgloss.NewStyle().Foreground(m.theme.SecondaryColor)
@@ -279,7 +280,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.optionsPane.Height = msg.Height - verticalMarginHeight
 
 			m.IdInput.SetHeight(msg.Height - verticalMarginHeight - idInputDscriptionHeight)
-			m.IdInput.SetWidth(w2 - 5) // FIXME: Magic number
+			m.IdInput.SetWidth(w2 - paneMargin)
 
 			m.resultsTable.SetColumns(getTableColumns(w2, m.options.includeWordCount))
 		}
