@@ -30,6 +30,12 @@ func clearNotifAfter(d time.Duration) tea.Cmd {
 	})
 }
 
+func sendNotificationMsg(msg string) tea.Cmd {
+	return func() tea.Msg {
+		return notificationMsg{message: msg}
+	}
+}
+
 func (m Model) copyToClipboard() tea.Msg {
 	row := m.resultsTable.SelectedRow()
 	clipboard.Write(clipboard.FmtText, fmt.Appendf(nil, "%s, %s, %s", row[0], row[1], row[2]))
@@ -101,7 +107,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resultsTable = t
 		m.results = msg
 		m.currentState = Results
-		cmds = append(cmds, m.timer.Stop(), m.timer.Reset())
+		cmds = append(cmds, m.timer.Stop(), m.timer.Reset(), sendNotificationMsg(fmt.Sprintf("Parsing completed in %s", m.timer.Elapsed().String())))
 	case parseFailureMsg:
 		m.err = msg
 		m.currentState = Confirm
