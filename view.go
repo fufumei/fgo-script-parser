@@ -160,10 +160,12 @@ func (m Model) miscOptionsContent() string {
 		description string
 		option      OptionsEnum
 	}{
-		{title: "No output file", description: "Print results only to the terminal.\n If unchecked, also outputs results to script-length.csv.", option: NoFile},
 		{title: "Include word count", description: "Calculates the approximate English word count per result.\nEnglish word count is conventionally half the character count.", option: IncludeWordCount},
+		{title: "No output file", description: "Print results only to the terminal.\nIf unchecked, also outputs results to a file next to the application executable.", option: NoFile},
+		{title: "Don't overwrite output file", description: "Append a random string to the output file name to prevent overwriting previous results.", option: UniqueFileName},
 	}
 
+	// TODO: Set up sections for these, like NoFile and UniqueFileName under a "Output File" section
 	var sb strings.Builder
 	sb.WriteString(lipgloss.NewStyle().Foreground(m.theme.TertiaryColor).Render("Options"))
 	sb.WriteString("\n")
@@ -179,6 +181,10 @@ func (m Model) miscOptionsContent() string {
 			}
 		case IncludeWordCount:
 			if m.options.includeWordCount {
+				prefix = selectedCheckbox
+			}
+		case UniqueFileName:
+			if m.options.uniqueFileName {
 				prefix = selectedCheckbox
 			}
 		}

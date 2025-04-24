@@ -13,6 +13,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-zoox/fetch"
+	"github.com/google/uuid"
 	"golang.org/x/exp/slices"
 )
 
@@ -74,7 +75,11 @@ func (m Model) parseScriptCmd() tea.Cmd {
 
 		var writer *csv.Writer
 		if !m.options.noFile {
-			file, err := CreateFile()
+			fileName := "script-length"
+			if m.options.uniqueFileName {
+				fileName = fmt.Sprintf("%s-%s", fileName, strings.Split(uuid.New().String(), "-")[0])
+			}
+			file, err := CreateFile(fileName + ".csv")
 			if err != nil {
 				return parseFailureMsg(err)
 			}
@@ -209,8 +214,8 @@ func (m Model) ParseFromLocal() ([]ParseResult, error) {
 	return results, nil
 }
 
-func CreateFile() (*os.File, error) {
-	file, err := os.Create("script-length.csv")
+func CreateFile(fileName string) (*os.File, error) {
+	file, err := os.Create(fileName)
 	if err != nil {
 		return nil, parseFailureMsg(fmt.Errorf("could not create output file. %s", err))
 	}

@@ -31,6 +31,7 @@ const (
 type Options struct {
 	noFile           bool
 	includeWordCount bool
+	uniqueFileName   bool
 	// Ignore subdirectory split for local files
 	// Map known main story chapter names (can work for local too with some regex)
 }
@@ -38,8 +39,9 @@ type Options struct {
 type OptionsEnum int
 
 const (
-	NoFile OptionsEnum = iota
-	IncludeWordCount
+	IncludeWordCount OptionsEnum = iota
+	NoFile
+	UniqueFileName
 	OptionsMaxCount int = iota
 )
 

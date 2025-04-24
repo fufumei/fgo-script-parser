@@ -204,6 +204,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.options.noFile = !m.options.noFile
 			case IncludeWordCount:
 				m.options.includeWordCount = !m.options.includeWordCount
+			case UniqueFileName:
+				m.options.uniqueFileName = !m.options.uniqueFileName
 			}
 
 		case key.Matches(msg, m.keymap.BlurInput):
