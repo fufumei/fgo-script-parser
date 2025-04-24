@@ -189,7 +189,9 @@ func (m Model) miscOptionsContent() string {
 			}
 		}
 
-		if m.currentOption == o.option {
+		if o.option == UniqueFileName && m.options.noFile {
+			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderInactiveState(o.title), m.theme.renderDisabledDescription(o.description)))
+		} else if m.currentOption == o.option {
 			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderSelected(o.title), m.theme.renderDescription(o.description)))
 		} else {
 			sb.WriteString(fmt.Sprintf(prefix+"%s\n%s\n", m.theme.renderNormalText(o.title), m.theme.renderDescription(o.description)))

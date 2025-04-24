@@ -83,6 +83,11 @@ func (t Theme) renderDescription(s string) string {
 	return style.Render(s)
 }
 
+func (t Theme) renderDisabledDescription(s string) string {
+	style := lipgloss.NewStyle().PaddingLeft(2).Foreground(t.Gray)
+	return style.Render(s)
+}
+
 func (t Theme) renderNormalText(s string) string {
 	style := lipgloss.NewStyle().Foreground(t.PrimaryColor)
 	return style.Render(s)

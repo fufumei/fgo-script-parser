@@ -178,7 +178,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case MiscOptions:
 				if int(m.currentOption) < OptionsMaxCount-1 {
-					m.currentOption = m.currentOption + 1
+					if !(m.options.noFile && m.currentOption+1 == UniqueFileName) {
+						m.currentOption = m.currentOption + 1
+					}
 				}
 			}
 
@@ -194,7 +196,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case MiscOptions:
 				if int(m.currentOption) > 0 {
-					m.currentOption = m.currentOption - 1
+					if !(m.options.noFile && m.currentOption-1 == UniqueFileName) {
+						m.currentOption = m.currentOption - 1
+					}
+
 				}
 			}
 
@@ -202,6 +207,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.currentOption {
 			case NoFile:
 				m.options.noFile = !m.options.noFile
+				m.options.uniqueFileName = false
 			case IncludeWordCount:
 				m.options.includeWordCount = !m.options.includeWordCount
 			case UniqueFileName:
