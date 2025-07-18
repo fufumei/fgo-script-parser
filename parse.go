@@ -107,70 +107,50 @@ func (m Model) parseScriptCmd() tea.Cmd {
 func (m Model) ParseFromAtlas() ([]ParseResult, error) {
 	var results []ParseResult
 
-	scripts := make(map[string]Script)
 	for id := range strings.SplitSeq(m.IdInput.Value(), "\n") {
-		// Skip empty rows
 		if strings.Trim(id, " ") == "" {
 			continue
 		}
 
+		var result ParseResult
+		var err error
 		switch m.selectedAtlasIdType {
 		case war:
-			s, name, err := FetchWarScripts(id)
+			scripts, name, err := FetchWarScripts(id)
 			if err != nil {
 				return nil, err
-			}
-			for _, script := range s {
-				scripts[script.ScriptId] = script
 			}
 			// The quest list for OC2 does not include the appendix
 			if id == "403" {
-				s, _, err = FetchQuestScripts("4000327")
+				additionalScripts, _, err := FetchQuestScripts("4000327")
 				if err != nil {
 					return nil, err
 				}
-				for _, script := range s {
-					scripts[script.ScriptId] = script
-				}
+				scripts = append(scripts, additionalScripts...)
 			}
 
-			var scr []Script
-			for _, v := range scripts {
-				scr = append(scr, v)
-			}
-			result, err := ParseScripts(scr, name)
+			result, err = ParseAtlasScripts(scripts, name)
 			if err != nil {
 				return nil, err
 			}
-			result.id = id
-			results = append(results, result)
 		case quest:
-			s, name, err := FetchQuestScripts(id)
+			scripts, name, err := FetchQuestScripts(id)
 			if err != nil {
 				return nil, err
-			}
-			for _, script := range s {
-				scripts[script.ScriptId] = script
 			}
 
-			var scr []Script
-			for _, v := range scripts {
-				scr = append(scr, v)
-			}
-			result, err := ParseScripts(scr, name)
+			result, err = ParseAtlasScripts(scripts, name)
 			if err != nil {
 				return nil, err
 			}
-			result.id = id
-			results = append(results, result)
 		case script:
-			result, err := FetchSingleScript(id)
+			result, err = FetchSingleScript(id)
 			if err != nil {
 				return nil, err
 			}
-			result.id = id
-			results = append(results, result)
 		}
+		result.id = id
+		results = append(results, result)
 	}
 
 	return results, nil
@@ -180,7 +160,6 @@ func (m Model) ParseFromLocal() ([]ParseResult, error) {
 	var results []ParseResult
 
 	for path := range strings.SplitSeq(m.IdInput.Value(), "\n") {
-		// Get rid of empty rows
 		if strings.Trim(path, " ") == "" {
 			continue
 		}
@@ -217,7 +196,7 @@ func CreateFile() (*os.File, error) {
 	return file, nil
 }
 
-func ParseScripts(scripts []Script, name string) (ParseResult, error) {
+func ParseAtlasScripts(scripts []Script, name string) (ParseResult, error) {
 	lines := 0
 	characters := 0
 	ch := make(chan Count, len(scripts))
@@ -340,7 +319,6 @@ func TraverseDirectories(path string, results *[]ParseResult) error {
 
 	lines := 0
 	characters := 0
-	// This could be done with goroutines but it's pretty fast already
 	for _, e := range entries {
 		data, err := os.ReadFile(filepath.Join(path, e.Name()))
 		if err != nil {
