@@ -45,3 +45,5 @@ FGO sometimes uses images to insert text with a different font, but there is no 
 For OC2, the appendix quest is not considered part of the quest list for war `403`, so it won't be fetched automatically when using Atlas. Because of this, there's a special clause when entering ID 403 when parsing Atlas war IDs, to also fetch the script from quest `4000327`, which is the appendix quest. This quest should be part of whatever quest list the Bleached Earth has, so take note of that.
 
 For the Ordeal Call Prologue, the two scripts `0400010110` and `0400019910` are actually the exact same script (one is just a redirect to the other, for some reason). The counting script doesn't take this into account, so you either need to divide the total ouput for this by 2, or simply remove one of the files from wherever you are counting (the total lines for this should be 95, for reference).
+
+Tunguska is split between the main story (ID `309`) and an event quest (ID `9128`), since the main story section actually only includes the prologue and epilogue. For now, you need to combine these two manually.
