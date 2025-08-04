@@ -21,8 +21,8 @@ func (m Model) View() string {
 		return ""
 	}
 
-	m.statePane.SetContent(m.statePaneContent())
-	m.optionsPane.SetContent(m.optionsPaneContent())
+	m.statePane.SetContent(m.renderStatePaneContent())
+	m.optionsPane.SetContent(m.renderOptionsPaneContent())
 
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
@@ -36,8 +36,8 @@ func (m Model) View() string {
 	)
 }
 
-func (m Model) statePaneContent() string {
-	// Nicer with a map but iteration over map is random order
+func (m Model) renderStatePaneContent() string {
+	// Would be nicer with a map but iteration over map is random order
 	steps := []struct {
 		state State
 		name  string
@@ -70,7 +70,7 @@ func (m Model) statePaneContent() string {
 	return sb.String()
 }
 
-func (m Model) optionsPaneContent() string {
+func (m Model) renderOptionsPaneContent() string {
 	switch m.currentState {
 	case SourceSelect:
 		return m.sourceSelectContent()
@@ -95,14 +95,14 @@ func (m Model) sourceSelectContent() string {
 		description string
 		source      Source
 	}{
-		{title: "Atlas", description: "Parse from scripts fetched from Atlas DB", source: atlas},
-		{title: "Local", description: "Parse from local files on your computer", source: local},
+		{title: "Atlas", description: "Parse from scripts fetched from Atlas DB.\nRequires an internet connection.", source: atlas},
+		{title: "Local", description: "Parse from your local files.", source: local},
 	}
 
 	var sb strings.Builder
 	sb.WriteString(m.theme.Text.OptionsPaneTitle.Render("Source"))
 	sb.WriteString("\n")
-	sb.WriteString(m.theme.Text.Default.Render("The source from which to fetch scripts.\nBoth options accept a list of scripts to parse.\nNote that parsing from Atlas requires an internet connection."))
+	sb.WriteString(m.theme.Text.Default.Render("The source from which to fetch scripts."))
 	sb.WriteString("\n\n")
 
 	for _, o := range options {

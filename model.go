@@ -32,8 +32,6 @@ type Options struct {
 	noFile           bool
 	includeWordCount bool
 	uniqueFileName   bool
-	// Ignore subdirectory split for local files
-	// Map known main story chapter names (can work for local too with some regex)
 }
 
 type OptionsEnum int
@@ -58,14 +56,14 @@ const (
 )
 
 type Model struct {
-	currentOption       OptionsEnum
-	currentState        State
-	selectedSource      Source
-	selectedAtlasIdType AtlasIdType
-	options             Options
-	results             []ParseResult
-	notification        notificationMsg
+	// Terminal state
+	ready                         bool
+	terminalWidth, terminalHeight int
+	quitting                      bool
+	abort                         bool
+	err                           error
 
+	// TUI state
 	theme                  Theme
 	help                   help.Model
 	keymap                 KeyMap
@@ -74,12 +72,15 @@ type Model struct {
 	loadingSpinner         spinner.Model
 	timer                  stopwatch.Model
 	resultsTable           table.Model
+	currentOption          OptionsEnum
+	currentState           State
+	results                []ParseResult
+	notification           notificationMsg
 
-	ready                         bool
-	terminalWidth, terminalHeight int
-	quitting                      bool
-	abort                         bool
-	err                           error
+	// Options state
+	selectedSource      Source
+	selectedAtlasIdType AtlasIdType
+	options             Options
 }
 
 func NewModel() Model {

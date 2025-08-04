@@ -268,12 +268,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statePane = viewport.New(w1, msg.Height-verticalMarginHeight)
 			m.statePane.Style = m.theme.Interface.StatePane
 			m.statePane.YPosition = headerHeight
-			m.statePane.SetContent(m.statePaneContent())
+			m.statePane.SetContent(m.renderStatePaneContent())
 
 			m.optionsPane = viewport.New(w2, msg.Height-verticalMarginHeight)
 			m.optionsPane.Style = m.theme.Interface.OptionsPane
 			m.optionsPane.YPosition = headerHeight
-			m.optionsPane.SetContent(m.optionsPaneContent())
+			m.optionsPane.SetContent(m.renderOptionsPaneContent())
 
 			m.IdInput.SetHeight(msg.Height - verticalMarginHeight - idInputDscriptionHeight)
 			m.IdInput.SetWidth(w2 - paneMargin)

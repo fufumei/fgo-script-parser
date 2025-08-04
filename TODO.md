@@ -1,5 +1,9 @@
 - Add back cmd functionality with Cobra
 - Filepicker input for local source (if it supports multi-selection)
 - Progress bar during parsing? Would need to send back how many scripts it is once they've been fetched or counted?
-- Basic translation table set up (at least for main story) with war IDs and their translated names, to ensure consistency between local and atlas usage (with a flag to ignore).
-- Buttons on "parse" step to ignore ID input and parse predetermined collections (arcs, all main story, etc)
+
+---
+
+- Under Atlas parsing, have an option for manual ID input, or to select from premade lists of IDs (all main story, part 1, EoR, part 2, OC, all events). Different option to split these into separate files?
+- Make the results screen either another viewport that can be toggled visible, or an entirely different screen (composed on top?) to be toggled between
+- For manual atlas ID input, just add three different inputs on the same step to input war, quest, and script IDs all together?
